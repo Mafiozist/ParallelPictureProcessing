@@ -5,23 +5,54 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ParallelPictureProcessing"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <StackPanel Orientation="Vertical" Margin="0,0,0,-6">
-        <Grid RenderTransformOrigin="0.485,0.364" Height="434" Width="800">
-            <StackPanel Margin="10,26,507,50" Orientation="Vertical">
-                <Label Content="Original" Height="23" Width="52"/>
-                <StackPanel Orientation="Horizontal">
-                    <Label Content="Format:" Height="23" Width="52"/>
-                    <Label x:Name="format"/>
-                </StackPanel>
-                <Image x:Name="originalImg" Height="258" Width="279" />
-                <Button Click="SelectImage_Click" Content="Select image" Height="26" Width="80"/>
+        Title="MainWindow" Width="800">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width=".35*"/>
+            <ColumnDefinition Width=".07*"/>
+            <ColumnDefinition Width=".55*" />
+        </Grid.ColumnDefinitions>
+
+        <StackPanel  Orientation="Vertical" Grid.Column="0" VerticalAlignment="Stretch">
+            <Label Content="Original" MinHeight="23" MinWidth="52"/>
+            <StackPanel  HorizontalAlignment="Left"  Orientation="Horizontal">
+                <Label Content="Format:" Height="23" Width="52"/>
+                <Label x:Name="format" />
             </StackPanel>
-            <StackPanel HorizontalAlignment="Left" Margin="400,26,0,0" Orientation="Vertical" VerticalAlignment="Top">
-                <Label Content="Transformed" Height="23" Width="79"/>
-                <Image x:Name="transformedImg" Height="302" Width="332"/>
+            <Image x:Name="originalImg" MinHeight="258" MinWidth="279" VerticalAlignment="Stretch"/>
+            <Button Click="SelectImage_Click" Content="Select image" Height="26" Width="80" RenderOptions.BitmapScalingMode="HighQuality" Grid.Column="1"/>
+        </StackPanel>
+        <Button  Content="Process" Click="Process_Click" Width="48" VerticalAlignment="Stretch" Height="30" Grid.Column="1" />
+        <StackPanel Orientation="Vertical"   Grid.Column="2">
+            <Label Content="Transformed" Height="23" Width="79"/>
+            <StackPanel  HorizontalAlignment="Left"  Orientation="Horizontal">
+                <Label Content="Format:" Height="23" Width="52"/>
+                <Label x:Name="transformedFormat" />
             </StackPanel>
-            <Button Margin="311,169,441,235" Content="Process" RenderTransformOrigin="2.042,1.036" Click="Process_Click"/>
-        </Grid>
-    </StackPanel>
+            <Image x:Name="transformedImg" MinHeight="302" MinWidth="332" Stretch="Fill" VerticalAlignment="Stretch" RenderOptions.BitmapScalingMode="HighQuality"/>
+            <Button Click="Revert_Click">Revert to Rgb</Button>
+        </StackPanel>
+    </Grid>
+    
+    
 </Window>
+
+    <!--
+    
+    <StackPanel  Orientation="Vertical" Margin="0,0,465,0" RenderTransformOrigin="0.5,0.5" VerticalAlignment="Stretch" >
+    <Label Content="Original" MinHeight="23" MinWidth="52"/>
+    <StackPanel MaxWidth="100" HorizontalAlignment="Left"  Orientation="Horizontal">
+        <Label Content="Format:" Height="23" Width="52"/>
+        <Label x:Name="format" MaxWidth="50"/>
+    </StackPanel>
+    <Image x:Name="originalImg" MinHeight="258" MinWidth="279"/>
+    <Button Click="SelectImage_Click" Content="Select image" Height="26" Width="80" RenderOptions.BitmapScalingMode="HighQuality"/>
+</StackPanel>
+<Button Margin="340,0,0,235" Content="Process" Click="Process_Click" Width="48" Height="30" HorizontalAlignment="Stretch"/>
+<StackPanel HorizontalAlignment="Right" Margin="388,0,0,0" Orientation="Vertical"  VerticalAlignment="Stretch" >
+    <Label Content="Transformed" Height="23" Width="79"/>
+    <Image x:Name="transformedImg" MinHeight="302" MinWidth="332" Stretch="Fill" RenderOptions.BitmapScalingMode="HighQuality"/>
+</StackPanel>
+    
+    
+    -->
