@@ -3,7 +3,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:ParallelPictureProcessing"
         mc:Ignorable="d"
         Title="MainWindow" Width="800">
     <Grid>
@@ -11,6 +10,7 @@
             <ColumnDefinition Width=".35*"/>
             <ColumnDefinition Width=".07*"/>
             <ColumnDefinition Width=".55*" />
+            <ColumnDefinition Width=".10*" />
         </Grid.ColumnDefinitions>
 
         <StackPanel  Orientation="Vertical" Grid.Column="0" VerticalAlignment="Stretch">
@@ -29,30 +29,16 @@
                 <Label Content="Format:" Height="23" Width="52"/>
                 <Label x:Name="transformedFormat" />
             </StackPanel>
+            <ComboBox SelectionChanged="ColorSpace_SelectionChanged">
+                <ComboBoxItem>0</ComboBoxItem>
+                <ComboBoxItem>1</ComboBoxItem>
+                <ComboBoxItem>2</ComboBoxItem>
+            </ComboBox>
             <Image x:Name="transformedImg" MinHeight="302" MinWidth="332" Stretch="Fill" VerticalAlignment="Stretch" RenderOptions.BitmapScalingMode="HighQuality"/>
             <Button Click="Revert_Click">Revert to Rgb</Button>
         </StackPanel>
+        
     </Grid>
     
     
 </Window>
-
-    <!--
-    
-    <StackPanel  Orientation="Vertical" Margin="0,0,465,0" RenderTransformOrigin="0.5,0.5" VerticalAlignment="Stretch" >
-    <Label Content="Original" MinHeight="23" MinWidth="52"/>
-    <StackPanel MaxWidth="100" HorizontalAlignment="Left"  Orientation="Horizontal">
-        <Label Content="Format:" Height="23" Width="52"/>
-        <Label x:Name="format" MaxWidth="50"/>
-    </StackPanel>
-    <Image x:Name="originalImg" MinHeight="258" MinWidth="279"/>
-    <Button Click="SelectImage_Click" Content="Select image" Height="26" Width="80" RenderOptions.BitmapScalingMode="HighQuality"/>
-</StackPanel>
-<Button Margin="340,0,0,235" Content="Process" Click="Process_Click" Width="48" Height="30" HorizontalAlignment="Stretch"/>
-<StackPanel HorizontalAlignment="Right" Margin="388,0,0,0" Orientation="Vertical"  VerticalAlignment="Stretch" >
-    <Label Content="Transformed" Height="23" Width="79"/>
-    <Image x:Name="transformedImg" MinHeight="302" MinWidth="332" Stretch="Fill" RenderOptions.BitmapScalingMode="HighQuality"/>
-</StackPanel>
-    
-    
-    -->
