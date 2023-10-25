@@ -1,4 +1,6 @@
-﻿using Microsoft.Win32;
+﻿using LiveCharts.Wpf;
+using LiveCharts;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -25,6 +27,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using static System.Net.Mime.MediaTypeNames;
+using System.Reflection.Emit;
+using LiveCharts.Defaults;
 
 namespace ParallelPictureProcessing
 {
@@ -38,9 +42,15 @@ namespace ParallelPictureProcessing
         byte[] YCbCrBytes;
         List<byte[]> picesOfYCbCrBytes;
 
+        public SeriesCollection SeriesCollection { get; set; } = new SeriesCollection();
+        public List<string> Labels { get; set; }
+        public Func<double, string> Formatter { get; set; }
+
+
         public MainWindow()
         {
             InitializeComponent();
+            
         }
         private void SelectImage_Click(object sender, RoutedEventArgs e)
         {
@@ -108,6 +118,45 @@ namespace ParallelPictureProcessing
             var select = sender as ComboBox;
             var index = Convert.ToInt32((select.SelectedValue as ComboBoxItem).Content);
             transformedImg.Source = Imaging.CreateBitmapSourceFromHBitmap(picesOfYCbCrBytes[index].ToBitmap((int) original.Width, (int) original.Height, System.Drawing.Imaging.PixelFormat.Format24bppRgb).GetHbitmap(), IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+        }
+
+        private void ChannelSelected_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if(picesOfYCbCrBytes is null || picesOfYCbCrBytes.Count == 0) return;
+
+            var select = sender as ComboBox;
+            var index = Convert.ToInt32((select.SelectedValue as ComboBoxItem).Content);
+
+            var dict = Utils.CountBytes(picesOfYCbCrBytes[index]);
+            dict.Remove(0);
+
+            SeriesCollection.Clear();
+
+            ChartValues<ObservablePoint> List1Points = new ChartValues<ObservablePoint>();
+
+            foreach ( var kvp in dict.OrderBy(a=>a.Key)) List1Points.Add(new ObservablePoint(kvp.Key, kvp.Value));
+
+            SeriesCollection.Add(new ColumnSeries() { Title = "Байты", Values = List1Points });
+
+            //Labels = dict.Keys.Select(i=> i.ToString()).ToList();
+            //Formatter = value => value.ToString("C");
+            DataContext = this;
+        }
+    }
+
+    public class Utils
+    {
+        public static Dictionary<byte, int> CountBytes(byte[] bytes)
+        {
+            Dictionary<byte, int> byteCounts = new Dictionary<byte, int>();
+
+            foreach (byte b in bytes)
+            {
+                if (!byteCounts.ContainsKey(b)) byteCounts.Add(b, 1);
+                else byteCounts[b] += 1;
+            }
+
+            return byteCounts;
         }
     }
 
