@@ -4,29 +4,79 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:lvc="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf"
         mc:Ignorable="d"
-        Title="MainWindow" Width="800" Height="700">
+        Title="MainWindow" Width="1520" Height="700">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width=".30*"/>
-            <ColumnDefinition Width=".07*"/>
-            <ColumnDefinition Width=".45*" />
+            <ColumnDefinition Width=".04*"/>
+            <ColumnDefinition Width=".30*"/>
         </Grid.ColumnDefinitions>
-        <Grid.RowDefinitions>
-            <RowDefinition Height=".6*"/>
-            <RowDefinition  Height=".3*"/>
-        </Grid.RowDefinitions>
 
-        <StackPanel  Orientation="Vertical" Grid.Column="0" VerticalAlignment="Stretch">
+        <Grid.RowDefinitions>
+            <RowDefinition Height=".9*"/>
+            <RowDefinition Height=".1*"/>
+        </Grid.RowDefinitions>
+        
+        <StackPanel  Orientation="Vertical" Grid.Column="0" VerticalAlignment="Stretch" Grid.Row="0">
             <Label Content="Original" MinHeight="23" MinWidth="52"/>
             <StackPanel  HorizontalAlignment="Left"  Orientation="Horizontal">
                 <Label Content="Format:" Height="23" Width="52"/>
                 <Label x:Name="format" />
             </StackPanel>
-            <Image x:Name="originalImg" MinHeight="258" MinWidth="279" VerticalAlignment="Stretch"/>
             <Button Click="SelectImage_Click" Content="Select image" Height="26" Width="80" RenderOptions.BitmapScalingMode="HighQuality" Grid.Column="1"/>
+            <Image x:Name="originalImg" MinHeight="258" MinWidth="279" VerticalAlignment="Stretch"/>
+        </StackPanel >
+
+
+
+
+        <StackPanel Orientation="Vertical" Grid.Column="1" Grid.Row="0">
+            <Button  Content="Process" Click="Process_Click" Width="48" VerticalAlignment="Center" Height="30" />
+            <Button  Content="ShowHistogramm" Click="ShowHistogramm_Click" Width="48" VerticalAlignment="Center" Height="30"  />
+            <ComboBox x:Name="ColorChannel" Visibility="Hidden">
+                <ComboBoxItem IsSelected="True">0</ComboBoxItem>
+                <ComboBoxItem>1</ComboBoxItem>
+                <ComboBoxItem>2</ComboBoxItem>
+            </ComboBox>
+
+            <StackPanel Orientation="Horizontal">
+                <Label >
+                    Ярк+= 
+                </Label>
+                <Label x:Name="Brightness"/>
+            </StackPanel>
+            <Slider x:Name="BrightSlider" ValueChanged="Slider_ValueChanged" SmallChange="1" LargeChange="10" Minimum="-255" Maximum="255"  Value="0" />
+
+            <StackPanel Orientation="Horizontal">
+                <Label >
+                 Контр+=
+                </Label>
+                <Label x:Name="Contrast"/>
+            </StackPanel>
+            <Slider x:Name="ContrastSlider" ValueChanged="ContrastSlider_ValueChanged" Minimum="0.5" Maximum="2" LargeChange="1" SmallChange=".1" Value="1"/>
+
+            <StackPanel>
+                <Label>Потоков</Label>
+                <Label x:Name="ThreadsCountLabel">Потоков</Label>
+                <Slider x:Name="ThreadsCount" ValueChanged="ThreadsCount_ValueChanged" Minimum="1" SmallChange="1" LargeChange="5" Maximum="20"></Slider>
+                <Label>Лог коэф</Label>
+                <TextBox x:Name="LogCoef" IsEnabled="True"></TextBox>
+                <Button Click="ParallelLogCorrectionProcess_Click">Лог преобр</Button>
+            </StackPanel>
+
+            <StackPanel>
+                <Label>Интенс.</Label>
+                <Label x:Name="IntensityLabel"></Label>
+                <Slider x:Name="IntensityVal" ValueChanged="IntensityVal_ValueChanged" Minimum="0" SmallChange="1" LargeChange="5" Maximum="255"></Slider>
+                <TextBox x:Name="coefVar" />
+                <Button Click="ParallelCorrectionByIntensity_Click">Интенс. преобр</Button>
+            </StackPanel>
         </StackPanel>
-        <Button  Content="Process" Click="Process_Click" Width="48" VerticalAlignment="Stretch" Height="30" Grid.Column="1" />
-        <StackPanel Orientation="Vertical"   Grid.Column="2">
+
+
+
+
+        <StackPanel Orientation="Vertical"   Grid.Column="2" Margin="0 0 20 10" Grid.Row="0">
             <Label Content="Transformed" Height="23" Width="79"/>
             <StackPanel  HorizontalAlignment="Left"  Orientation="Horizontal">
                 <Label Content="Format:" Height="23" Width="52"/>
@@ -36,28 +86,13 @@
                 <ComboBoxItem>0</ComboBoxItem>
                 <ComboBoxItem>1</ComboBoxItem>
                 <ComboBoxItem>2</ComboBoxItem>
+                <ComboBoxItem>3</ComboBoxItem>
             </ComboBox>
             <Button Click="Revert_Click" Content="Revert to Rgb"/>
             <Image x:Name="transformedImg" MinHeight="302" MinWidth="332" Stretch="Fill" VerticalAlignment="Stretch" RenderOptions.BitmapScalingMode="HighQuality"/>
         </StackPanel>
-        <StackPanel Orientation="Vertical" Grid.Row="1" Margin="0,15,10,0" Grid.ColumnSpan="3">
-            <ComboBox SelectionChanged="ChannelSelected_SelectionChanged">
-                <ComboBoxItem>0</ComboBoxItem>
-                <ComboBoxItem>1</ComboBoxItem>
-                <ComboBoxItem>2</ComboBoxItem>
-            </ComboBox>
-            <lvc:CartesianChart Series="{Binding SeriesCollection}" LegendLocation="Bottom" VerticalAlignment="Stretch" MinHeight="200">
-                <lvc:CartesianChart.AxisX>
-                    <lvc:Axis  Labels="{Binding Labels}" MaxValue="256" MinValue="0"></lvc:Axis>
-                </lvc:CartesianChart.AxisX>
-                <lvc:CartesianChart.AxisY>
-                    <lvc:Axis ></lvc:Axis>
-                </lvc:CartesianChart.AxisY>
-                <lvc:CartesianChart.DataTooltip>
-                    <lvc:DefaultTooltip SelectionMode="SharedXValues"></lvc:DefaultTooltip>
-                </lvc:CartesianChart.DataTooltip>
-            </lvc:CartesianChart>
-        </StackPanel>
+
+        <TextBox x:Name="Logs" Grid.Row="1" Grid.ColumnSpan="3" ></TextBox>
     </Grid>
 
 
