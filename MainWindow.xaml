@@ -65,10 +65,8 @@
             </StackPanel>
 
             <StackPanel>
-                <Label>Интенс.</Label>
-                <Label x:Name="IntensityLabel"></Label>
-                <Slider x:Name="IntensityVal" ValueChanged="IntensityVal_ValueChanged" Minimum="0" SmallChange="1" LargeChange="5" Maximum="255"></Slider>
-                <TextBox x:Name="coefVar" />
+                <Label>Точки</Label>
+                <TextBox x:Name="coefVar"  TextWrapping="Wrap"/>
                 <Button Click="ParallelCorrectionByIntensity_Click">Интенс. преобр</Button>
             </StackPanel>
         </StackPanel>

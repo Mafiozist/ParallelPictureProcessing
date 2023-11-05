@@ -32,6 +32,7 @@ using LiveCharts.Defaults;
 using System.Threading.Channels;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
+using System.Text.RegularExpressions;
 
 namespace ParallelPictureProcessing
 {
@@ -218,31 +219,23 @@ namespace ParallelPictureProcessing
 
             var threadsNum = 1;
             var val = 1;
-            try
-            {
-                threadsNum = Convert.ToInt32(ThreadsCount.Value);
-                val = Convert.ToInt32(coefVar.Text);
-            }
-            catch
-            {
+            try{  threadsNum = Convert.ToInt32(ThreadsCount.Value);}
+            catch{}
 
-            }
+            if(!Regex.IsMatch(coefVar.Text, @"^\d+,\d+;(\s*\d+,\d+;)*$")) return;
 
-
-            picesOfYCbCrBytes[0] = Utils.IncreaseIntensityValue(ref picesOfYCbCrBytes, channelIndex: 0, (int) Math.Round(IntensityVal.Value), Convert.ToInt32(coefVar.Text), threadsNum);
+            string[] points = coefVar.Text.Split(';');
+            
+            picesOfYCbCrBytes[0] = Utils.IncreaseIntensityValueByPoints(ref picesOfYCbCrBytes, channelIndex: 0, points.SkipLast(1).ToArray(), threadsNum);
             sw.Stop();
-            AddLogs("ParallelCorrectionByIntensity_Click", $"выполнился за {sw.Elapsed} в {threadsNum} потоках");
+
+            AddLogs("ParallelCorrectionByIntensityPoints_Click", $"выполнился за {sw.Elapsed} в {threadsNum} потоках");
             SetTransformedImageFromBytes(picesOfYCbCrBytes[0], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
         }
 
         private void ThreadsCount_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             ThreadsCountLabel.Content = Math.Round((sender as Slider).Value);
-        }
-
-        private void IntensityVal_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            IntensityLabel.Content = Math.Round((sender as Slider).Value);
         }
 
     }
@@ -274,47 +267,49 @@ namespace ParallelPictureProcessing
             }
         }
 
-        public static byte[] IncreaseIntensityValue(ref List<byte[]> bytes, int channelIndex, int intensity, int val, int threadsNum)
+        public static byte[] IncreaseIntensityValueByPoints(ref List<byte[]> bytes, int channelIndex, string[] points, int threadsNum)
         {
             var nBytes = new byte[bytes[channelIndex].Length];
             Array.Copy(bytes[channelIndex], nBytes, nBytes.Length);
 
+
+
             ParallelOptions parallelOptions = new ParallelOptions()
             {
-                MaxDegreeOfParallelism = threadsNum
+                MaxDegreeOfParallelism = threadsNum,
             };
+
 
             lock (nBytes)
             {
                 Parallel.For(0, nBytes.Length, parallelOptions, i =>
                 {
-                    if (nBytes[i] == intensity) nBytes[i] = (byte)Math.Max(0, Math.Min(255, val + nBytes[i]));
+                    for (int d = 0; d < points.Length; ++d)
+                    {
+                        //Previous points
+                        byte prevX = (byte)(d == 0 ? 0 : Math.Max(0, Math.Min(255, Convert.ToInt32(points[d - 1].Split(',')[0])))); 
+                        byte prevY = (byte)(d == 0 ? 0 : Math.Max(0, Math.Min(255, Convert.ToInt32(points[d-1].Split(',')[1]))));
+
+                        //Current points
+                        byte x = (byte) Math.Max(0, Math.Min(255,Convert.ToInt32(points[d].Split(',')[0])));
+                        byte y = (byte) Math.Max(0, Math.Min(255, Convert.ToInt32(points[d].Split(',')[1])));
+
+                        //Если значение входит в текущий диапазон перобразований
+                        if (nBytes[i] > prevX && nBytes[i] < x) {
+
+                            double k = (double) (y - prevY) / (x - prevX); //Вычисляем угол наклона k
+                            double b = (double) y - (k * x);//Вычисляем смещение b
+                            nBytes[i] = (byte)Math.Max(0, Math.Min(255, k * nBytes[i] + b));
+
+                            break;
+                        } else continue;
+                    }
                 });
             }
 
             return nBytes;
         }
 
-        //public static byte[] IncreaseIntensityValueByPoints(ref List<byte[]> bytes, ChangeIntensityByPointsDTO dto)
-        //{
-        //    var nBytes = new byte[bytes[dto.ChannelIndex].Length];
-        //    Array.Copy(bytes[dto.ChannelIndex], nBytes, nBytes.Length);
-
-        //    ParallelOptions parallelOptions = new ParallelOptions()
-        //    {
-        //        MaxDegreeOfParallelism = dto.ThreadsCount
-        //    };
-
-        //    lock (nBytes)
-        //    {
-        //        Parallel.For(0, nBytes.Length, parallelOptions, i =>
-        //        {
-        //            nBytes[i] = (byte)Math.Max(0, Math.Min(255, dto.Val + nBytes[i]));
-        //        });
-        //    }
-
-        //    return nBytes;
-        //}
 
         public static void IncreaseContrastValue(ref List<byte[]> bytes, int channelIndex, double val)
         {
@@ -443,7 +438,7 @@ namespace ParallelPictureProcessing
                 try { 
                     nBytes[i + 1] = (byte) Cb;
                     CbBytes[i + 1] = (byte) Cb;
-                    YBytes[i + 1] = empty;
+                    YBytes[i + 1] = (byte)Y;
                     CrBytes[i + 1] = empty;
                 } catch { }
 
@@ -451,7 +446,7 @@ namespace ParallelPictureProcessing
                     nBytes[i + 2] = (byte) Cr;
                     CrBytes[i + 2] = (byte) Cr;
                     CbBytes[i + 2] = empty;
-                    YBytes[i + 2] = empty; 
+                    YBytes[i + 2] = (byte)Y; 
                 } catch { }
 
             }
