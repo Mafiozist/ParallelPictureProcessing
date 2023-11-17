@@ -33,25 +33,34 @@ using System.Threading.Channels;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 using System.Text.RegularExpressions;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Collections.Concurrent;
+using Iced.Intel;
+using Perfolizer.Mathematics.RangeEstimators;
+using System.Data;
+using System.Windows.Media.Media3D;
 
 namespace ParallelPictureProcessing
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-
     public partial class MainWindow : Window
     {
         BitmapImage original;
         Bitmap originalBmp;
+
         byte[] YCbCrBytes;
         List<byte[]> picesOfYCbCrBytes;
-
+        List<HSVPixel[]> picesOfHSV;
 
         public MainWindow()
         {
             InitializeComponent();
-            
+            DataContext = this;
         }
 
         private void SelectImage_Click(object sender, RoutedEventArgs e)
@@ -93,21 +102,65 @@ namespace ParallelPictureProcessing
             
             BrightSlider.Value = 0;
             ContrastSlider.Value = 1;
+            NoiseLevel.Value = 0;
+            SelectedChannel.SelectedIndex = 0;
+            Logs.Text = "";
+            //LogsRaw.Text = "";
 
-            //Converting img to desire format
             var standardBitmapAndBytes = originalBmp.ToByte24BppRgbArray();
-            var colors = standardBitmapAndBytes.Item1.ToYCbCrJpegFormat();
-            YCbCrBytes = colors[0];
-            picesOfYCbCrBytes = new List<byte[]>(colors);
 
-            SetTransformedImageFromBytes(YCbCrBytes, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            switch (Convert.ToInt32((ColorModelType.SelectedItem as ComboBoxItem).Tag))
+            {
+                default:
+                case 0:
+
+                    //Converting img to YCbCr format
+                    var colors = standardBitmapAndBytes.Item1.ToYCbCrJpegFormat();
+                    YCbCrBytes = colors[0];
+                    picesOfYCbCrBytes = new List<byte[]>(colors);
+
+                    break;
+
+
+
+                case 1:
+                    picesOfHSV = standardBitmapAndBytes.Item1.ToHSVFormat();
+                    var tasks = new Task[4];
+                    picesOfYCbCrBytes = new List<byte[]>();
+
+                    var allBytes = new byte[4][];
+
+                    var res = Parallel.For(0, picesOfHSV.Count, i =>
+                    {
+                        if(i == 0 || i == 1) tasks[i] = Task.Run(() => allBytes[i] = picesOfHSV[i].ToColorBytesFromHSV());
+                        else tasks[i] = Task.Run(() => allBytes[i] = picesOfHSV[i].ToBytesFromHSV());
+                    });
+                          
+                    try
+                    {
+                        Task.WaitAll(tasks);
+                        
+                        foreach(var bytes in allBytes)
+                        {
+                            picesOfYCbCrBytes.Add(bytes);
+                        }
+
+                        YCbCrBytes = picesOfYCbCrBytes[0];
+                    }
+                    catch(Exception err) { MessageBox.Show(err.Message); }
+                    break;
+            }
+
+            if (YCbCrBytes != null) SetTransformedImageFromBytes(YCbCrBytes, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            else MessageBox.Show("Базовые байты не установлены");
         }
 
         //Function for parallel lof transformation of image
         private void ParallelLogCorrectionProcess_Click(object sender, RoutedEventArgs e)
         {
+
             if (picesOfYCbCrBytes is null || picesOfYCbCrBytes.Count == 0) return;
-            
+
             Stopwatch stopwatch = Stopwatch.StartNew();
             var threadsNum = 1;
             var coef = 1d;
@@ -126,7 +179,8 @@ namespace ParallelPictureProcessing
                 MaxDegreeOfParallelism = threadsNum
             };
 
-            lock (picesOfYCbCrBytes[0]) { 
+            lock (picesOfYCbCrBytes[0])
+            {
 
                 Parallel.For(0, picesOfYCbCrBytes[0].Length, parallelOptions, i =>
                 {
@@ -137,51 +191,65 @@ namespace ParallelPictureProcessing
             }
 
             stopwatch.Stop();
-            AddLogs("ParallelLogCorrectionProcess_Click", $"выполнился за {stopwatch.Elapsed} в {threadsNum} потоках");
+            AddLogs("ParallelLogCorrectionProcess_Click", $"выполнился за {stopwatch.Elapsed} в {threadsNum} потоках", Convert.ToString(stopwatch.Elapsed.TotalMilliseconds));
             SetTransformedImageFromBytes(picesOfYCbCrBytes[0], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
         }
 
-        public void AddLogs(string method,string text)
+        public void AddLogs(string method,string text, string rawVal)
         {
             var nString = $"Message from {method}: {text};\n";
             StringBuilder sb = new StringBuilder(Logs.Text);
 
             sb.Append(nString);
             Logs.Text = sb.ToString();
+
+            StringBuilder sbRaw = new StringBuilder(LogsRaw.Text);
+            sbRaw.Append(rawVal + '\n');
+            LogsRaw.Text = sbRaw.ToString();
         }
 
         public void SetTransformedImageFromBytes(byte[] bytes, System.Drawing.Imaging.PixelFormat format)
         {
-            transformedImg.Source = Imaging.CreateBitmapSourceFromHBitmap(bytes.ToBitmap((int)original.Width, (int)original.Height, format).GetHbitmap(), IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+            try
+            {
+                transformedImg.Source = Imaging.CreateBitmapSourceFromHBitmap(bytes.ToBitmap((int)original.Width, (int)original.Height, format).GetHbitmap(), IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+            }
+            catch (Exception ex){ MessageBox.Show(ex.Message); }
         }
 
         private void Revert_Click(object sender, RoutedEventArgs e)
         {
+            int index = Convert.ToInt32((ColorModelType.SelectedItem as ComboBoxItem).Tag);
+
             if (YCbCrBytes is null) return;
+
+            byte[] bytes = index == 0 ? YCbCrBytes.ToRgbFromYCbCrJpegFormat() : YCbCrBytes;
+
             transformedImg.Source = Imaging.CreateBitmapSourceFromHBitmap(
-                YCbCrBytes.ToRgbFromYCbCrJpegFormat()
+                bytes
                 .ToBitmap(
                     Convert.ToInt32(original.Width),
                     Convert.ToInt32(original.Height),
                     System.Drawing.Imaging.PixelFormat.Format24bppRgb).GetHbitmap(),
-                    IntPtr.Zero, 
-                    Int32Rect.Empty, 
+                    IntPtr.Zero,
+                    Int32Rect.Empty,
                     BitmapSizeOptions.FromEmptyOptions()
                 );
         }
 
         private void ColorSpace_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (picesOfYCbCrBytes is null) return;
-
             var select = sender as ComboBox;
             var index = Convert.ToInt32((select.SelectedValue as ComboBoxItem).Content);
+            if (picesOfYCbCrBytes is null) return;
             SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
         }
 
         private void ShowHistogramm_Click(object sender, RoutedEventArgs e)
         {
-            if (picesOfYCbCrBytes is null || picesOfYCbCrBytes.Count == 0) {
+
+            if (picesOfYCbCrBytes is null || picesOfYCbCrBytes.Count == 0)
+            {
                 MessageBox.Show("Каналы пусты. Необходимо их заполнить!");
                 return;
             };
@@ -191,46 +259,86 @@ namespace ParallelPictureProcessing
 
         private void Slider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (picesOfYCbCrBytes is null || picesOfYCbCrBytes.Count == 0) return;
-            
             var slider = sender as Slider;
-            var val = slider.Value; 
+            var val = slider.Value;
             Brightness.Content = Math.Round(val);
+            var index = 0;
 
-            Utils.IncreaseChannelValue(ref picesOfYCbCrBytes, channelIndex: 0, (int) Math.Round(val));//0 исходное изображение преобр в ycbcr
-            SetTransformedImageFromBytes(picesOfYCbCrBytes[0], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            try { index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content); } catch { }
+
+
+            if (picesOfYCbCrBytes is null || picesOfYCbCrBytes.Count == 0) return;
+
+            Stopwatch sw = Stopwatch.StartNew();
+
+            Utils.IncreaseChannelValue(ref picesOfYCbCrBytes, channelIndex: index, (int)Math.Round(val));//0 исходное изображение преобр в ycbcr
+            SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+
+            sw.Stop();
+            AddLogs("BrightSlider_ValueChanged", $"выполнился за {sw.Elapsed} в {1} потоке", Convert.ToString(sw.Elapsed.TotalMilliseconds));
+
         }
 
         private void ContrastSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (picesOfYCbCrBytes is null || picesOfYCbCrBytes.Count == 0) return;
-
             var slider = sender as Slider;
             var val = slider.Value;
             Contrast.Content = val;
+            var index = 0;
 
-            Utils.IncreaseContrastValue(ref picesOfYCbCrBytes, channelIndex: 0, val);//0 исходное изображение преобр в ycbcr
-            SetTransformedImageFromBytes(picesOfYCbCrBytes[0], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            try { index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content); } catch (Exception ex) { }
+
+
+            if (picesOfYCbCrBytes is null || picesOfYCbCrBytes.Count == 0) return;
+
+            Stopwatch sw = Stopwatch.StartNew();
+            Utils.IncreaseContrastValue(ref picesOfYCbCrBytes, channelIndex: index, val);//0 исходное изображение преобр в ycbcr
+            SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+
+            sw.Stop();
+            AddLogs("ContrastSlider_ValueChanged", $"выполнился за {sw.Elapsed} в {1} потоке", Convert.ToString(sw.Elapsed.TotalMilliseconds));
+
         }
 
         private void ParallelCorrectionByIntensity_Click(object sender, RoutedEventArgs e)
         {
-            var sw = Stopwatch.StartNew();
+            if (!Regex.IsMatch(coefVar.Text, @"^\d+,\d+;(\s*\d+,\d+;)*$")) return;
 
             var threadsNum = 1;
             var val = 1;
-            try{  threadsNum = Convert.ToInt32(ThreadsCount.Value);}
-            catch{}
-
-            if(!Regex.IsMatch(coefVar.Text, @"^\d+,\d+;(\s*\d+,\d+;)*$")) return;
+            try { threadsNum = Convert.ToInt32(ThreadsCount.Value); }
+            catch { }
 
             string[] points = coefVar.Text.Split(';');
-            
+
+
+            var sw = Stopwatch.StartNew();
             picesOfYCbCrBytes[0] = Utils.IncreaseIntensityValueByPoints(ref picesOfYCbCrBytes, channelIndex: 0, points.SkipLast(1).ToArray(), threadsNum);
             sw.Stop();
 
-            AddLogs("ParallelCorrectionByIntensityPoints_Click", $"выполнился за {sw.Elapsed} в {threadsNum} потоках");
+            AddLogs("ParallelCorrectionByIntensityPoints_Click", $"выполнился за {sw.Elapsed} в {threadsNum} потоках", Convert.ToString(sw.Elapsed.TotalMilliseconds));
             SetTransformedImageFromBytes(picesOfYCbCrBytes[0], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+        }
+
+        private void ParallelCorrectionByIntensityFromClear_Click(object sender, RoutedEventArgs e)//ParallelCorrectionByIntensityFromClear_Click
+        {
+            if (!Regex.IsMatch(coefVar.Text, @"^\d+,\d+;(\s*\d+,\d+;)*$")) return;
+            Process_Click(sender, e);
+
+            var threadsNum = 1;
+            var val = 1;
+            try { threadsNum = Convert.ToInt32(ThreadsCount.Value); }
+            catch { }
+
+            string[] points = coefVar.Text.Split(';');
+
+            var sw = Stopwatch.StartNew();
+            picesOfYCbCrBytes[0] = Utils.IncreaseIntensityValueByPoints(ref picesOfYCbCrBytes, channelIndex: 0, points.SkipLast(1).ToArray(), threadsNum);
+            sw.Stop();
+
+            AddLogs("ParallelCorrectionByIntensityPoints_Click", $"выполнился за {sw.Elapsed} в {threadsNum} потоках", Convert.ToString(sw.Elapsed.TotalMilliseconds));
+            SetTransformedImageFromBytes(picesOfYCbCrBytes[0], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+
         }
 
         private void ThreadsCount_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -238,18 +346,123 @@ namespace ParallelPictureProcessing
             ThreadsCountLabel.Content = Math.Round((sender as Slider).Value);
         }
 
-    }
+        private void ColorModelType_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (Convert.ToInt32(((sender as ComboBox).SelectedItem as ComboBoxItem).Tag) == 1)
+            {
+                picesOfYCbCrBytes = null;
+                YCbCrBytes = null;
+                return;
+            }
 
-    public class ChangeIntensityByPointsDTO
-    {
-        public int PixelSize { get; set; }
-        public int Width { get; set; }
-        public int Height { get; set; }
-        public int ThreadsCount { get; set; }
-        public System.Drawing.Point Start { get; set; }
-        public System.Drawing.Point End { get; set; }
-        public byte Val { get; set; }
-        public int ChannelIndex { get; set; }
+            if (Convert.ToInt32(((sender as ComboBox).SelectedItem as ComboBoxItem).Tag) == 0)
+            {
+                picesOfHSV = null; 
+                return;
+            }
+        }
+
+        //Лаба2
+        private void NoiseLevel_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            var textContent=(NoiseLevelLabel.Content as AccessText);
+            var sliderVal=(int) (sender as Slider).Value;
+            textContent.Text=textContent.Text.Remove(textContent.Text.IndexOf(':') + 1);
+            textContent.Text+=$"{sliderVal}%";
+        }
+
+        private void AddNoiseBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content);
+
+            if (picesOfYCbCrBytes == null || picesOfYCbCrBytes.Count == 0) return;
+
+            picesOfYCbCrBytes[index] = ImageNoiseAndFilteringExtensions.AddImpulseNoise(ref picesOfYCbCrBytes, index, (int)NoiseLevel.Value, (int)ThreadsCount.Value, (int)WhiteToBlackPercent.Value, RandomNoise.IsChecked ?? false);
+            SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+        }
+
+        private void WhiteToBlackPercent_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            var textContent = (WhiteToBlackPercentLabel.Content as AccessText);
+            var sliderVal = (int)(sender as Slider).Value;
+            textContent.Text = textContent.Text.Remove(textContent.Text.IndexOf(':') + 1);
+            textContent.Text += $"{sliderVal}%";
+        }
+
+        private void AddMultyNoiseBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content);
+
+            try
+            {
+
+                if (picesOfYCbCrBytes == null || picesOfYCbCrBytes.Count == 0) return;
+
+                var min = Convert.ToDouble(minMultyCoef.Text);
+                var max = Convert.ToDouble(maxMultyCoef.Text);
+
+                picesOfYCbCrBytes[index] = ImageNoiseAndFilteringExtensions.AddMultyNoise(ref picesOfYCbCrBytes, index, min, max, (int)ThreadsCount.Value);
+                SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+
+        private void AddAdditiveNoiseBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content);
+
+
+            try
+            {
+
+                if (picesOfYCbCrBytes == null || picesOfYCbCrBytes.Count == 0) return;
+                double val = Convert.ToDouble(maxAdditiveCoef.Text);
+                picesOfYCbCrBytes[index] = ImageNoiseAndFilteringExtensions.AddAdditiveNoise(ref picesOfYCbCrBytes, index, val, (int)ThreadsCount.Value);
+                SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+
+        private void transformedImg_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (transformedImg.Source is null) return;
+
+            // Получаем изображение из элемента Image
+            System.Windows.Controls.Image image = (System.Windows.Controls.Image)sender;
+            BitmapSource bitmapSource = (BitmapSource)image.Source;
+
+            // Создаем кодек для сохранения изображения в файл (например, в формате PNG)
+            PngBitmapEncoder encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmapSource));
+
+            // Создаем диалоговое окно для выбора места сохранения файла
+            SaveFileDialog saveFileDialog = new SaveFileDialog();
+            saveFileDialog.Filter = "PNG Files (*.png)|*.png|All files (*.*)|*.*";
+            if (saveFileDialog.ShowDialog() == true)
+            {
+                // Сохраняем изображение в выбранное место
+                using (FileStream fs = new FileStream(saveFileDialog.FileName, FileMode.Create))
+                {
+                    encoder.Save(fs);
+                }
+            }
+        }
+
+        private void LinearFilter_Click(object sender, RoutedEventArgs e)
+        {
+            if (picesOfYCbCrBytes == null || picesOfYCbCrBytes.Count == 0) return;
+            var index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content);
+
+            picesOfYCbCrBytes[index]= ImageNoiseAndFilteringExtensions.ApplyLinearFilter(picesOfYCbCrBytes[index], (int)original.Height, (int)original.Width, Kernel.Text, 3);
+            SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+        }
     }
 
     public class Utils
@@ -272,13 +485,10 @@ namespace ParallelPictureProcessing
             var nBytes = new byte[bytes[channelIndex].Length];
             Array.Copy(bytes[channelIndex], nBytes, nBytes.Length);
 
-
-
             ParallelOptions parallelOptions = new ParallelOptions()
             {
                 MaxDegreeOfParallelism = threadsNum,
             };
-
 
             lock (nBytes)
             {
@@ -337,9 +547,53 @@ namespace ParallelPictureProcessing
 
             return byteCounts;
         }
+
+        public static double[,] StringToDoubleArray(string input)
+        {
+            // Разделение строки на строки элементов
+            string[] rows = input.Split(';');
+
+            // Определение размерности массива
+            int rowCount = rows.Length-1;
+            int colCount = rows[0].Split(' ').Length;
+
+            // Создание двумерного массива
+            double[,] result = new double[rowCount, colCount];
+
+            // Заполнение массива значениями
+            try
+            {
+                for (int i = 0; i < rowCount; i++)
+                {
+                    // Разделение строки на элементы
+                    string[] elements = rows[i].Split(' ');
+
+                    for (int j = 0; j < colCount; j++)
+                    {
+                        // Преобразование строки в double
+                        if (elements[j].Contains('/'))
+                        {
+                            var vals = elements[j].Split("/");
+                            result[i, j] = Convert.ToDouble(vals[0]) / Convert.ToDouble(vals[1]);
+                        }
+                        else if (double.TryParse(elements[j].Trim().Replace('.', ','), out double value))
+                        {
+                            result[i, j] = value;
+                        }
+                        else
+                        {
+                            // Обработка ошибки преобразования
+                            throw new Exception($"Ошибка преобразования элемента {elements[j]} в строке {i + 1}, столбце {j + 1}.");
+                        }
+                    }
+                }
+            }catch (Exception ex) { MessageBox.Show(ex.Message); }
+
+            return result;
+        }
     }
 
-    public static class ImageExtensions
+    public static class ImageExtensions //Лаба1
     {
         public static byte[] ToByteArray(this System.Drawing.Image image, ImageFormat format)
         {
@@ -382,6 +636,8 @@ namespace ParallelPictureProcessing
 
         public static Bitmap ToBitmap(this byte[] bytes, int width, int height, System.Drawing.Imaging.PixelFormat pFormat)
         {
+            if (bytes == null) throw new ArgumentNullException("bytes");
+
             var nBitmap = new Bitmap(width, height);
 
             var rect = new System.Drawing.Rectangle(0, 0, nBitmap.Width, nBitmap.Height);
@@ -417,13 +673,6 @@ namespace ParallelPictureProcessing
                     Cb = (int)(128 - (0.1168736 * r) - (0.331264 * g) + (0.5 * b)),
                     Cr = (int)(128 + (0.5 * r) - (0.418688 * g) - 0.081312 * b);
 
-                //const float scale = 257.0f / 65535.0f;
-                //const float offset = 257.0f;
-
-                //int Y = (int)((65.481f * r * scale) + (128.553f * g * scale) + (24.996 * b * scale) + (16.0f * offset)),
-                //    Cb = (int)((r * -37.797f * scale) + (g * -74.203f * scale) + (b * 112.0f * scale) + (128.0f * offset)),
-                //    Cr = (int)((r * 112.0f * scale) + (g * -93.786f * scale) + (b * -18.214f * scale) + (128.0f * offset)) ;
-
                 Y = Math.Max(0, Math.Min(255, Y));
                 Cb = Math.Max(0, Math.Min(255, Cb));
                 Cr = Math.Max(0, Math.Min(255, Cr));
@@ -458,12 +707,318 @@ namespace ParallelPictureProcessing
 
             return allTheBytes;
         }
+    }
+
+    public static class ImageNoiseAndFilteringExtensions
+    {
+        volatile static int CountOfNoises = 0;
+        volatile static Dictionary<int, bool> randomIndecies = new (); 
+
+        public static byte[] AddImpulseNoise(ref List<byte[]> bytes, int channelIndex, int percent, int threadsNum, int blackPercent, bool random)
+        {
+            if (bytes == null || percent == 0) return bytes[channelIndex];
+            CountOfNoises = 0;
+
+            byte[] curBytes = bytes[channelIndex];
+            var ct = new CancellationTokenSource();//ForThreadsStopping
+
+            ParallelOptions parallelOptions = new ParallelOptions()
+            {
+                MaxDegreeOfParallelism = threadsNum,
+                CancellationToken = ct.Token,
+            };
+            
+            var noises = (int) Math.Round((random? curBytes.Length : curBytes.Length / 3) * (percent / 100d));
+            var blackCount = Convert.ToInt32(((blackPercent / 100d)) * noises);
+            var whiteCount = noises - blackCount;
+            if (random) GenerateRandomIndices(curBytes.Length, noises, threadsNum);
+
+            lock (curBytes)
+            {
+                try
+                {
+                    bool isWhite = true;
+                    for(int i = 0; i < curBytes.Length; i+=3)
+                    {
+                        if (random)
+                        {
+                            if (randomIndecies.ContainsKey(i) && blackCount > 0 && isWhite || randomIndecies.ContainsKey(i) && blackCount > 0 && whiteCount <= 0)//i % 2 == 0 && 
+                            {
+                                curBytes[i] = 255;
+                                curBytes[i+1] = 255;
+                                curBytes[i + 2] = 255;
+                                isWhite = false;
+                                --whiteCount;
+                                CountOfNoises++;
+                            }
+                            else if (randomIndecies.ContainsKey(i) && !isWhite && whiteCount > 0 || randomIndecies.ContainsKey(i) && whiteCount > 0 && blackCount <= 0)//i % 2 != 0 && 
+                            {
+                                curBytes[i] = 0;
+                                curBytes[i + 1] = 0;
+                                curBytes[i + 2] = 0;
+                                isWhite = true;
+                                --whiteCount;
+                                --blackCount;
+                                CountOfNoises++;
+                            }
+
+                        }
+                        else
+                        {
+
+                            if (blackCount <= 0)
+                            {
+                                curBytes[i] = 255;
+                                curBytes[i + 1] = 255;
+                                curBytes[i + 2] = 255;
+                                CountOfNoises++;
+                            }
+                            else if (blackCount != 0)
+                            {
+                                curBytes[i] = 0;
+                                curBytes[i + 1] = 0;
+                                curBytes[i + 2] = 0;
+                                --blackCount;
+                                CountOfNoises++;
+                            }
+
+                        }
+
+                        if (CountOfNoises >= noises) break;
+                    };
+                }
+                catch { }
+            }
+
+            return curBytes;
+        }
+
+        static void GenerateRandomIndices(int arrayLength, int n, int tNum)
+        {
+            if (n > arrayLength)
+            {
+                throw new ArgumentException("n cannot be greater than the array length.");
+            }
+
+            Random rand = new Random();
+            randomIndecies = new ();
+
+            CancellationTokenSource ct = new CancellationTokenSource();
+            ParallelOptions options = new ParallelOptions() { MaxDegreeOfParallelism = tNum, CancellationToken = ct.Token };
+
+            try
+            {
+                Parallel.For(0, arrayLength, options, i =>
+                {
+                    int randomIndex;
+                    do
+                    {
+                        randomIndex = rand.Next(arrayLength);
+                    } while (randomIndecies.ContainsKey(randomIndex)); // Ensure uniqueness
+
+                    randomIndecies[randomIndex] = true;
+
+                    if (randomIndecies.Count == n) ct.Cancel();
+                });
+            }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
+            
+        }
+
+        public static byte[] AddMultyNoise(ref List<byte[]> bytes, int channelIndex, double minCoef, double maxCoef, int threadsNum)
+        {
+            if (bytes == null) return bytes[channelIndex];
+            CountOfNoises = 0;
+
+            byte[] curBytes = bytes[channelIndex];
+            var ct = new CancellationTokenSource();//ForThreadsStopping
+
+            ParallelOptions parallelOptions = new ParallelOptions()
+            {
+                MaxDegreeOfParallelism = threadsNum,
+                CancellationToken = ct.Token,
+            };
+
+            Parallel.For(0, curBytes.Length, parallelOptions, i =>
+            {
+                Random random = new Random();
+                double val = curBytes[i] * (random.NextDouble() * (maxCoef - minCoef) + minCoef);
+                curBytes[i] = Convert.ToByte(Math.Max(0, Math.Min(255, val)));
+            });
+
+            return curBytes;
+        }
+
+        public static byte[] AddAdditiveNoise(ref List<byte[]> bytes, int channelIndex, double max, int threadsNum)
+        {
+            if(bytes == null) return bytes[channelIndex];
+            CountOfNoises = 0;
+
+            byte[] curBytes = bytes[channelIndex];
+            var ct = new CancellationTokenSource();//ForThreadsStopping
+
+            ParallelOptions parallelOptions = new ParallelOptions()
+            {
+                MaxDegreeOfParallelism = threadsNum,
+                CancellationToken = ct.Token,
+            };
+
+            Random r = new Random();
+
+            lock (bytes)
+            {
+                Parallel.For(0, curBytes.Length, i =>
+                {
+                    int noiseVal = (int)(r.NextDouble() * max - max / 2);
+                    curBytes[i] = (byte)Math.Max(0, Math.Min(255, curBytes[i] + noiseVal));
+                });
+              
+            }
+
+            return curBytes;
+        }
+
+        public static List<HSVPixel[]> ToHSVFormat(this byte[] oBytes)
+        {
+            var allTheBytes = new List<HSVPixel[]>();
+
+            int size = oBytes.Length / 3;
+            var nBytes = new HSVPixel[size];
+            var HBytes = new HSVPixel[size];
+            var SBytes = new HSVPixel[size];
+            var VBytes = new HSVPixel[size];
+
+            for (int i = 0, d = 0; i < oBytes.Length; i += 3, d += 1)//8 - a, 8 - b, 8 - r, 8 - g
+            {
+                double r = 0.0d, g = 0.0d, b = 0.0d;
+
+                try { r = oBytes[i] / 255.0d; } catch { }
+                try { g = oBytes[i + 1] / 255.0d; } catch { }
+                try { b = oBytes[i + 2] / 255.0d; } catch { }
+
+                double maxRGB = Math.Max(r, Math.Max(g, b));
+                double minRGB = Math.Min(r, Math.Min(g, b));
+
+                double S = maxRGB == 0 ? 0 : 1 - (minRGB / maxRGB),
+                       V = maxRGB;
+
+                double H = GetH(r, g, b, maxRGB, minRGB);
+
+                //while (H > 360) H -= 360;
+
+                H = Math.Max(0, Math.Min(360, H));
+                S = Math.Max(0, Math.Min(1, S));
+                V = Math.Max(0, Math.Min(1, V));
+
+                try
+                {
+                    //All the values
+                    nBytes[d] = new HSVPixel() { H = H, S = S, V = V };
+
+                    //H bytes
+                    HBytes[d] = new HSVPixel() { H = H, S = 1, V = 1 };
+
+                    //SV
+                    SBytes[d] = new HSVPixel() { H = S, S = S, V = S };
+                    VBytes[d] = new HSVPixel() { H = V, S = V, V = V };
+                }
+                catch { }
+            }
+
+            allTheBytes.Add(nBytes);
+            allTheBytes.Add(HBytes);
+            allTheBytes.Add(SBytes);
+            allTheBytes.Add(VBytes);
+
+            return allTheBytes;
+        }
+
+        public static byte[] ToColorBytesFromHSV(this HSVPixel[] channel)
+        {
+
+            byte[] bytes = new byte[channel.Length * 3];
+
+            for (int i = 0, d = 0; i < channel.Length; i++, d += 3)
+            {
+
+                if (channel[i].S == 0)
+                { // находимся на оси симметрии - оттенки серого 
+                    bytes[d] = Convert.ToByte(Math.Max(0, Math.Min(255, channel[i].V * 255))); // если V=0 черный цвет 
+                    bytes[d + 1] = Convert.ToByte(Math.Max(0, Math.Min(255, channel[i].V * 255)));
+                    bytes[d + 2] = Convert.ToByte(Math.Max(0, Math.Min(255, channel[i].V * 255)));
+                }
+                else
+                {
+                    bytes[d] = bytes[d + 1] = bytes[d + 2] = 0;
+
+                    int sector = (int)Math.Floor(channel[i].H / 60); // floor(x) возвращает наибольшее целое <= x 
+                    double frac = channel[i].H / 60d - sector; // дробная часть H/60 
+                    double T = channel[i].V * (1 - channel[i].S);
+                    double P = channel[i].V * (1 - channel[i].S * frac);
+                    double Q = channel[i].V * (1 - channel[i].S * (1 - frac));
+
+                    byte bT = Convert.ToByte(Math.Max(0, Math.Min(255, T * 255))),
+                         bP = Convert.ToByte(Math.Max(0, Math.Min(255, P * 255))),
+                         bQ = Convert.ToByte(Math.Max(0, Q * 255)),
+                         bV = Convert.ToByte(Math.Max(0, Math.Min(255, channel[i].V * 255)));
+
+                    try
+                    {
+                        switch (sector)
+                        {
+                            case 0: bytes[d] = bV; bytes[d + 1] = bQ; bytes[d + 2] = bT; break;
+                            case 1: bytes[d] = bP; bytes[d + 1] = bV; bytes[d + 2] = bT; break;
+                            case 2: bytes[d] = bT; bytes[d + 1] = bV; bytes[d + 2] = bQ; break;
+                            case 3: bytes[d] = bT; bytes[d + 1] = bP; bytes[d + 2] = bV; break;
+                            case 4: bytes[d] = bQ; bytes[d + 1] = bT; bytes[d + 2] = bV; break;
+                            case 5: bytes[d] = bV; bytes[d + 1] = bT; bytes[d + 2] = bP; break;
+                        }
+                    }
+                    catch { }
+                }
+
+            }
+
+            return bytes;
+        }
+
+        public static byte[] ToBytesFromHSV(this HSVPixel[] channel)
+        {
+            int size = (channel.Length * 3);
+            byte[] bytes = new byte[size];
+
+            for (int i = 0, d = 0; i < channel.Length; i++, d += 3)
+            {
+                if (d + 3 > size) break;
+                try { bytes[d] = bytes[d + 1] = bytes[d + 2] = Convert.ToByte(Math.Max(0, Math.Min(255, channel[i].H * 255.0))); }
+                catch { }
+            }
+
+            return bytes;
+        }
+
+        public static double GetH(double r, double g, double b, double maxRGB, double minRGB)
+        {
+            double h = 0.0;
+
+            if (maxRGB == minRGB) return 0.0d;
+
+            if (maxRGB == r && g >= b) return 60 * ((g - b) / (maxRGB - minRGB)) + 0;
+
+            else if (maxRGB == r && g < b) return 60 * ((g - b) / (maxRGB - minRGB)) + 360;
+
+            if (maxRGB == g) return 60 * ((b - r) / (maxRGB - minRGB)) + 120;
+
+            if (maxRGB == b) return 60 * ((r - g) / (maxRGB - minRGB)) + 240;
+
+            return h;
+        }
 
         public static byte[] ToRgbFromYCbCrJpegFormat(this byte[] oBytes)
         {
             var nBytes = new byte[oBytes.Length];
 
-            for (int i = 0; i < oBytes.Length; i+=3)//8 - a, 8 - b, 8 - r, 8 - g
+            for (int i = 0; i < oBytes.Length; i += 3)//8 - a, 8 - b, 8 - r, 8 - g
             {
                 byte y = 0, cr = 0, cb = 0;
 
@@ -472,8 +1027,8 @@ namespace ParallelPictureProcessing
                 try { cb = oBytes[i + 2]; } catch { }
 
 
-                int r = (int) (y + 1.402 * (cr - 128)),
-                    g = (int) (y - 0.344136 * (cb - 128) - 0.714136 * (cr -128)),
+                int r = (int)(y + 1.402 * (cr - 128)),
+                    g = (int)(y - 0.344136 * (cb - 128) - 0.714136 * (cr - 128)),
                     b = (int)(y + 1.772 * (cb - 128));
 
                 r = Math.Max(0, Math.Min(255, r));
@@ -487,5 +1042,82 @@ namespace ParallelPictureProcessing
 
             return nBytes;
         }
+
+        public static byte[] ApplyLinearFilter(byte[] image, int width, int height, string kernelString, int pixelSize)
+        {
+            double[,] kernel = Utils.StringToDoubleArray(kernelString);
+
+            byte[] result = new byte[image.Length];
+
+            int kernelWidth = kernel.GetLength(1),
+                kernelHeight = kernel.GetLength(0),
+                kernelOffset = (kernelWidth - 1) / 2,
+                calcOffset = 0,
+                byteOffset = 0;
+
+            double blue = 0.0,
+                green = 0.0,
+                red = 0.0;
+
+            for (int offsetY = kernelOffset; offsetY < height - kernelOffset; offsetY++)
+            {
+                for (int offsetX = kernelOffset; offsetX < width - kernelOffset; offsetX++)
+                {
+                    blue = 0;
+                    green = 0;
+                    red = 0;
+
+                    byteOffset = offsetY * width * pixelSize + offsetX * pixelSize;
+
+                    for (int kernelY = -kernelOffset; kernelY <= kernelOffset; kernelY++)
+                    {
+                        for (int kernelX = -kernelOffset; kernelX <= kernelOffset; kernelX++)
+                        {
+                            calcOffset = byteOffset + (kernelX * pixelSize) + (kernelY * width * pixelSize);
+
+                            try
+                            {
+                                blue += (double)(image[calcOffset]) * kernel[kernelY + kernelOffset, kernelX + kernelOffset];
+                                green += (double)(image[calcOffset + 1]) * kernel[kernelY + kernelOffset, kernelX + kernelOffset];
+                                red += (double)(image[calcOffset + 2]) * kernel[kernelY + kernelOffset, kernelX + kernelOffset];
+                            }
+                            catch
+                            {
+                                blue = 0;
+                                green = 0;
+                                red = 0;
+                            }
+                        }
+                    }
+
+                    blue = Math.Max(0, Math.Min(255, blue));
+                    red = Math.Max(0, Math.Min(255, red));
+                    green = Math.Max(0, Math.Min(255, green));
+
+                    result[byteOffset] = (byte)(blue);
+                    result[byteOffset + 1] = (byte)(green);
+                    result[byteOffset + 2] = (byte)(red);
+                    result[byteOffset + 3] = 255;
+                }
+            }
+
+            return result;
+        }
+
+
     }
+
+    public class ColorType
+    {
+        public int Key { get; set; }
+        public string Value { get; set; } = String.Empty;
+    }
+
+    public class HSVPixel
+    {
+        public double H { get; set; }
+        public double S { get; set; }
+        public double V { get; set; }
+    }
+
 }

@@ -2,10 +2,13 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:lvc="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:lvc="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf" xmlns:local="clr-namespace:ParallelPictureProcessing"
         mc:Ignorable="d"
-        Title="MainWindow" Width="1520" Height="700">
+        Title="MainWindow" Width="1520" Height="900" >
+    
     <Grid>
+        
+        
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width=".30*"/>
             <ColumnDefinition Width=".04*"/>
@@ -30,8 +33,14 @@
 
 
 
-        <StackPanel Orientation="Vertical" Grid.Column="1" Grid.Row="0">
-            <Button  Content="Process" Click="Process_Click" Width="48" VerticalAlignment="Center" Height="30" />
+        <StackPanel Orientation="Vertical" Grid.Column="1" Grid.Row="0" >
+
+            <ComboBox x:Name="ColorModelType" SelectionChanged="ColorModelType_SelectionChanged">
+                <ComboBoxItem Tag="0" IsSelected="True">YCbCr</ComboBoxItem>
+                <ComboBoxItem Tag="1">HSV</ComboBoxItem>
+            </ComboBox>
+
+            <Button x:Name="ProcessBtn"  Content="Process" Click="Process_Click" Width="48" VerticalAlignment="Center" Height="30" />
             <Button  Content="ShowHistogramm" Click="ShowHistogramm_Click" Width="48" VerticalAlignment="Center" Height="30"  />
             <ComboBox x:Name="ColorChannel" Visibility="Hidden">
                 <ComboBoxItem IsSelected="True">0</ComboBoxItem>
@@ -67,8 +76,40 @@
             <StackPanel>
                 <Label>Точки</Label>
                 <TextBox x:Name="coefVar"  TextWrapping="Wrap"/>
-                <Button Click="ParallelCorrectionByIntensity_Click">Интенс. преобр</Button>
+                <Button Click="ParallelCorrectionByIntensity_Click">Кусоч. преобр</Button>
+                <Button Click="ParallelCorrectionByIntensityFromClear_Click">Кусоч. с нуля</Button>
             </StackPanel>
+
+            <StackPanel>
+                <Label x:Name="NoiseLevelLabel">
+                    <Label.Content>
+                        <AccessText TextWrapping="Wrap" Text="Лаба2.Ур.зашумленности: {}%"/>
+                    </Label.Content>
+                </Label>
+                <CheckBox x:Name="RandomNoise" IsChecked="true">Рандом</CheckBox>
+                <Slider x:Name="NoiseLevel" ValueChanged="NoiseLevel_ValueChanged" Minimum="0" SmallChange="1" LargeChange="5" Maximum="100"></Slider>
+                <Label x:Name="WhiteToBlackPercentLabel">
+                    <Label.Content>
+                        <AccessText TextWrapping="Wrap" Text="Процент чкб:"/>
+                    </Label.Content>
+                </Label>
+                <Slider x:Name="WhiteToBlackPercent" ValueChanged="WhiteToBlackPercent_ValueChanged" Minimum="0" SmallChange="1" LargeChange="5" Maximum="100"></Slider>
+                <Button x:Name="AddNoiseBtn" Click="AddNoiseBtn_Click">Noise process</Button>
+
+                <Label>Макс откл</Label>
+                <TextBox x:Name="maxAdditiveCoef"></TextBox>
+                <Button Click="AddAdditiveNoiseBtn_Click">Additive noise proc</Button>
+                
+                <StackPanel Orientation="Horizontal">
+                    <TextBox x:Name="minMultyCoef" Width="47"></TextBox>
+                    <TextBox x:Name="maxMultyCoef" Width="47"></TextBox>
+                </StackPanel>
+                <Button Click="AddMultyNoiseBtn_Click">Multy noise proc</Button>
+            </StackPanel>
+
+            <TextBox x:Name="Kernel" AcceptsReturn="True"></TextBox>
+            <Button x:Name="LinearFilter" Click="LinearFilter_Click">Linear filter</Button>
+            
         </StackPanel>
 
 
@@ -80,17 +121,18 @@
                 <Label Content="Format:" Height="23" Width="52"/>
                 <Label x:Name="transformedFormat" />
             </StackPanel>
-            <ComboBox SelectionChanged="ColorSpace_SelectionChanged">
-                <ComboBoxItem>0</ComboBoxItem>
+            <ComboBox x:Name="SelectedChannel" SelectionChanged="ColorSpace_SelectionChanged">
+                <ComboBoxItem IsSelected="True">0</ComboBoxItem>
                 <ComboBoxItem>1</ComboBoxItem>
                 <ComboBoxItem>2</ComboBoxItem>
                 <ComboBoxItem>3</ComboBoxItem>
             </ComboBox>
             <Button Click="Revert_Click" Content="Revert to Rgb"/>
-            <Image x:Name="transformedImg" MinHeight="302" MinWidth="332" Stretch="Fill" VerticalAlignment="Stretch" RenderOptions.BitmapScalingMode="HighQuality"/>
+            <Image x:Name="transformedImg" MinHeight="302" MouseDown="transformedImg_MouseDown" MinWidth="332" Stretch="Fill" VerticalAlignment="Stretch" RenderOptions.BitmapScalingMode="HighQuality"/>
         </StackPanel>
 
-        <TextBox x:Name="Logs" Grid.Row="1" Grid.ColumnSpan="3" ></TextBox>
+        <TextBox x:Name="Logs" Grid.Row="1" Grid.ColumnSpan="2" ></TextBox>
+        <TextBox x:Name="LogsRaw" Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="1" ></TextBox>
     </Grid>
 
 
