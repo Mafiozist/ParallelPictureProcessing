@@ -12,6 +12,7 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width=".30*"/>
             <ColumnDefinition Width=".04*"/>
+            <ColumnDefinition Width=".04*"/>
             <ColumnDefinition Width=".30*"/>
         </Grid.ColumnDefinitions>
 
@@ -79,43 +80,42 @@
                 <Button Click="ParallelCorrectionByIntensity_Click">Кусоч. преобр</Button>
                 <Button Click="ParallelCorrectionByIntensityFromClear_Click">Кусоч. с нуля</Button>
             </StackPanel>
-
-            <StackPanel>
-                <Label x:Name="NoiseLevelLabel">
-                    <Label.Content>
-                        <AccessText TextWrapping="Wrap" Text="Лаба2.Ур.зашумленности: {}%"/>
-                    </Label.Content>
-                </Label>
-                <CheckBox x:Name="RandomNoise" IsChecked="true">Рандом</CheckBox>
-                <Slider x:Name="NoiseLevel" ValueChanged="NoiseLevel_ValueChanged" Minimum="0" SmallChange="1" LargeChange="5" Maximum="100"></Slider>
-                <Label x:Name="WhiteToBlackPercentLabel">
-                    <Label.Content>
-                        <AccessText TextWrapping="Wrap" Text="Процент чкб:"/>
-                    </Label.Content>
-                </Label>
-                <Slider x:Name="WhiteToBlackPercent" ValueChanged="WhiteToBlackPercent_ValueChanged" Minimum="0" SmallChange="1" LargeChange="5" Maximum="100"></Slider>
-                <Button x:Name="AddNoiseBtn" Click="AddNoiseBtn_Click">Noise process</Button>
-
-                <Label>Макс откл</Label>
-                <TextBox x:Name="maxAdditiveCoef"></TextBox>
-                <Button Click="AddAdditiveNoiseBtn_Click">Additive noise proc</Button>
-                
-                <StackPanel Orientation="Horizontal">
-                    <TextBox x:Name="minMultyCoef" Width="47"></TextBox>
-                    <TextBox x:Name="maxMultyCoef" Width="47"></TextBox>
-                </StackPanel>
-                <Button Click="AddMultyNoiseBtn_Click">Multy noise proc</Button>
-            </StackPanel>
-
-            <TextBox x:Name="Kernel" AcceptsReturn="True"></TextBox>
-            <Button x:Name="LinearFilter" Click="LinearFilter_Click">Linear filter</Button>
-            
+ 
         </StackPanel>
 
+        <StackPanel Grid.Column="2">
+            <Label x:Name="NoiseLevelLabel">
+                <Label.Content>
+                    <AccessText TextWrapping="Wrap" Text="Лаба2.Ур.зашумленности: {}%"/>
+                </Label.Content>
+            </Label>
+            <CheckBox x:Name="RandomNoise" IsChecked="true">Рандом</CheckBox>
+            <Slider x:Name="NoiseLevel" ValueChanged="NoiseLevel_ValueChanged" Minimum="0" SmallChange="1" LargeChange="5" Maximum="100"></Slider>
+            <Label x:Name="WhiteToBlackPercentLabel">
+                <Label.Content>
+                    <AccessText TextWrapping="Wrap" Text="Процент чкб:"/>
+                </Label.Content>
+            </Label>
+            <Slider x:Name="WhiteToBlackPercent" ValueChanged="WhiteToBlackPercent_ValueChanged" Minimum="0" SmallChange="1" LargeChange="5" Maximum="100"></Slider>
+            <Button x:Name="AddNoiseBtn" Click="AddNoiseBtn_Click">Noise process</Button>
 
+            <Label>Макс откл</Label>
+            <TextBox x:Name="maxAdditiveCoef"></TextBox>
+            <Button Click="AddAdditiveNoiseBtn_Click">Additive noise proc</Button>
 
+            <StackPanel Orientation="Horizontal">
+                <TextBox x:Name="minMultyCoef" Width="47"></TextBox>
+                <TextBox x:Name="maxMultyCoef" Width="47"></TextBox>
+            </StackPanel>
+            <Button Click="AddMultyNoiseBtn_Click">Multy noise proc</Button>
 
-        <StackPanel Orientation="Vertical"   Grid.Column="2" Margin="0 0 20 10" Grid.Row="0">
+            <TextBox x:Name="Kernel" AcceptsReturn="True" TextWrapping="Wrap">
+                1/9 1/9 1/9;1/9 1/9 1/9;1/9 1/9 1/9;
+            </TextBox>
+            <Button x:Name="LinearFilter" Click="LinearFilter_Click">Linear filter</Button>
+        </StackPanel>
+        
+        <StackPanel Orientation="Vertical"   Grid.Column="3" Margin="0 0 20 10" Grid.Row="0">
             <Label Content="Transformed" Height="23" Width="79"/>
             <StackPanel  HorizontalAlignment="Left"  Orientation="Horizontal">
                 <Label Content="Format:" Height="23" Width="52"/>
@@ -131,8 +131,8 @@
             <Image x:Name="transformedImg" MinHeight="302" MouseDown="transformedImg_MouseDown" MinWidth="332" Stretch="Fill" VerticalAlignment="Stretch" RenderOptions.BitmapScalingMode="HighQuality"/>
         </StackPanel>
 
-        <TextBox x:Name="Logs" Grid.Row="1" Grid.ColumnSpan="2" ></TextBox>
-        <TextBox x:Name="LogsRaw" Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="1" ></TextBox>
+        <TextBox x:Name="Logs" Grid.Row="1" Grid.ColumnSpan="3" ></TextBox>
+        <TextBox x:Name="LogsRaw" Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" ></TextBox>
     </Grid>
 
 
