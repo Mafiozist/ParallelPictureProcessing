@@ -1044,69 +1044,6 @@ namespace ParallelPictureProcessing
             return nBytes;
         }
 
-        public static byte[] ApplyLinearFilter(byte[] image, int width, int height, string kernelString, int pixelSize)
-        {
-            double[,] kernel = Utils.StringToDoubleArray(kernelString);
-
-            byte[] result = new byte[image.Length];
-
-            int kernelWidth = kernel.GetLength(1),
-                kernelHeight = kernel.GetLength(0),
-                kernelOffset = (kernelWidth - 1) / 2,
-                calcOffset = 0,
-                byteOffset = 0;
-
-
-
-            double blue = 0.0,
-                green = 0.0,
-                red = 0.0;
-
-            for (int offsetY = kernelOffset; offsetY < height - kernelOffset; offsetY++)
-            {
-                for (int offsetX = kernelOffset; offsetX < width - kernelOffset; offsetX++)
-                {
-                    blue = 0;
-                    green = 0;
-                    red = 0;
-
-                    byteOffset = offsetY * width * pixelSize + offsetX * pixelSize;
-
-                    for (int kernelY = -kernelOffset; kernelY <= kernelOffset; kernelY++)
-                    {
-                        for (int kernelX = -kernelOffset; kernelX <= kernelOffset; kernelX++)
-                        {
-                            calcOffset = byteOffset + (kernelX * pixelSize) + (kernelY * width * pixelSize);
-
-                            try
-                            {
-                                blue += (double)(image[calcOffset]) * kernel[kernelY + kernelOffset, kernelX + kernelOffset];
-                                green += (double)(image[calcOffset + 1]) * kernel[kernelY + kernelOffset, kernelX + kernelOffset];
-                                red += (double)(image[calcOffset + 2]) * kernel[kernelY + kernelOffset, kernelX + kernelOffset];
-                            }
-                            catch
-                            {
-                                red = 0;
-                                green = 0;
-                                blue = 0;
-                            }
-                        }
-                    }
-
-                    blue = Math.Max(0, Math.Min(255, blue));
-                    red = Math.Max(0, Math.Min(255, red));
-                    green = Math.Max(0, Math.Min(255, green));
-
-                    result[byteOffset] = (byte)(blue);
-                    result[byteOffset + 1] = (byte)(green);
-                    result[byteOffset + 2] = (byte)(red);
-                    result[byteOffset + 3] = 255;
-                }
-            }
-
-            return result;
-        }
-
         public static byte[] ApplyConvolutionFilterParallel(byte[] image, double[,] kernel, int width, int height, int ppb, int threads = 1)
         {
             int kernelSize = kernel.GetLength(0);
@@ -1144,30 +1081,9 @@ namespace ParallelPictureProcessing
         }
 
 
-
-        public static byte[] ApplyLinearFilter2(byte[] image, int width, int height, string kernelString, int pixelSize)
-        {
-            double[,] kernel = Utils.StringToDoubleArray(kernelString);
-
-            byte[] result = new byte[image.Length];
-
-            int kernelWidth = kernel.GetLength(1),
-                kernelHeight = kernel.GetLength(0),
-                kernelOffset = (kernelWidth - 1) / 2,
-                calcOffset = 0,
-                byteOffset = 0;
-
-
-            Parallel.For(kernelOffset, image.Length, (offsetX) =>
-            {
-
-            });
-
-            return new byte[444];
-        }
      }
 
-        public class ColorType
+    public class ColorType
     {
         public int Key { get; set; }
         public string Value { get; set; } = String.Empty;
