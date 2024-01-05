@@ -460,7 +460,8 @@ namespace ParallelPictureProcessing
             if (picesOfYCbCrBytes == null || picesOfYCbCrBytes.Count == 0) return;
             var index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content);
 
-            picesOfYCbCrBytes[index]= ImageNoiseAndFilteringExtensions.ApplyLinearFilter(picesOfYCbCrBytes[index], (int)original.Height, (int)original.Width, Kernel.Text, 3);
+            //picesOfYCbCrBytes[index]= ImageNoiseAndFilteringExtensions.ApplyLinearFilter(picesOfYCbCrBytes[index], (int)original.Height, (int)original.Width, Kernel.Text, 3);
+            picesOfYCbCrBytes[index] = ImageNoiseAndFilteringExtensions.ApplyConvolutionFilterParallel(picesOfYCbCrBytes[index], Utils.StringToDoubleArray(Kernel.Text), (int)original.Width, (int)original.Height, 3, Convert.ToInt32(ThreadsCount.Value));
             SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
         }
     }
@@ -712,7 +713,7 @@ namespace ParallelPictureProcessing
     public static class ImageNoiseAndFilteringExtensions
     {
         volatile static int CountOfNoises = 0;
-        volatile static Dictionary<int, bool> randomIndecies = new (); 
+        volatile static ConcurrentDictionary<int, bool> randomIndecies = new (); 
 
         public static byte[] AddImpulseNoise(ref List<byte[]> bytes, int channelIndex, int percent, int threadsNum, int blackPercent, bool random)
         {
@@ -1055,6 +1056,8 @@ namespace ParallelPictureProcessing
                 calcOffset = 0,
                 byteOffset = 0;
 
+
+
             double blue = 0.0,
                 green = 0.0,
                 red = 0.0;
@@ -1083,9 +1086,9 @@ namespace ParallelPictureProcessing
                             }
                             catch
                             {
-                                blue = 0;
-                                green = 0;
                                 red = 0;
+                                green = 0;
+                                blue = 0;
                             }
                         }
                     }
@@ -1104,10 +1107,87 @@ namespace ParallelPictureProcessing
             return result;
         }
 
+        public static byte[] ApplyConvolutionFilterParallel(byte[] image, double[,] kernel, int width, int height, int ppb, int threads = 1)
+        {
+            int kernelSize = kernel.GetLength(0);
+            int padding = (kernelSize - 1)  / 2;
 
-    }
+            Parallel.For(padding, (height - padding), new ParallelOptions() { MaxDegreeOfParallelism= threads}, y =>
+            {
+                for (int x = padding; x < (width - padding) * ppb; x += 3)
+                {
 
-    public class ColorType
+                    int left = Math.Max(0, y - padding); // Левая граница
+                    int right = Math.Min((width * ppb) - 1, y + padding); // Правая граница
+                    int top = Math.Max(0, x - padding); // Верхняя граница
+                    int bottom = Math.Min(height - 1, x + padding); // Нижняя граница
+                    byte r=0, g=0, b = 0;
+
+                    for (int i = top, row= 0; i <= bottom; i++, row++)//x
+                    {
+                        for (int j = left, column = 0; j <= right; j++, column++) //y
+                        {
+                            double kernelCoef = kernel[row, column];
+                            int index = i * width * ppb + j;
+
+                            try
+                            {
+                                r += Convert.ToByte(Math.Max(0, Math.Min(255, kernelCoef * image[index])));
+                            }
+                            catch { }
+
+                            try
+                            {
+                                g += Convert.ToByte(Math.Max(0, Math.Min(255, kernelCoef * image[index + 1])));
+                            }
+                            catch { }
+
+                            try
+                            {
+                                b += Convert.ToByte(Math.Max(0, Math.Min(255, kernelCoef * image[index + 2])));
+                            }
+                            catch { }
+
+                        }
+                    }
+
+                    try
+                    {
+                        int outerIndex = (y * width + x) * ppb;
+                        image[outerIndex] = b;
+                        image[outerIndex + 1] = g;
+                        image[outerIndex + 2] = r;
+                    }catch (Exception) { }
+                }
+            });
+
+            return image;
+        }
+
+
+        public static byte[] ApplyLinearFilter2(byte[] image, int width, int height, string kernelString, int pixelSize)
+        {
+            double[,] kernel = Utils.StringToDoubleArray(kernelString);
+
+            byte[] result = new byte[image.Length];
+
+            int kernelWidth = kernel.GetLength(1),
+                kernelHeight = kernel.GetLength(0),
+                kernelOffset = (kernelWidth - 1) / 2,
+                calcOffset = 0,
+                byteOffset = 0;
+
+
+            Parallel.For(kernelOffset, image.Length, (offsetX) =>
+            {
+
+            });
+
+            return new byte[444];
+        }
+     }
+
+        public class ColorType
     {
         public int Key { get; set; }
         public string Value { get; set; } = String.Empty;
