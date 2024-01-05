@@ -713,7 +713,7 @@ namespace ParallelPictureProcessing
     public static class ImageNoiseAndFilteringExtensions
     {
         volatile static int CountOfNoises = 0;
-        volatile static ConcurrentDictionary<int, bool> randomIndecies = new (); 
+        volatile static Dictionary<int, bool> randomIndecies = new (); 
 
         public static byte[] AddImpulseNoise(ref List<byte[]> bytes, int channelIndex, int percent, int threadsNum, int blackPercent, bool random)
         {
@@ -1110,59 +1110,39 @@ namespace ParallelPictureProcessing
         public static byte[] ApplyConvolutionFilterParallel(byte[] image, double[,] kernel, int width, int height, int ppb, int threads = 1)
         {
             int kernelSize = kernel.GetLength(0);
-            int padding = (kernelSize - 1)  / 2;
+            int padding = (kernelSize - 1) / 2;
 
-            Parallel.For(padding, (height - padding), new ParallelOptions() { MaxDegreeOfParallelism= threads}, y =>
+            Parallel.For(padding, height - padding, new ParallelOptions { MaxDegreeOfParallelism = threads }, y =>
             {
-                for (int x = padding; x < (width - padding) * ppb; x += 3)
+                for (int x = padding; x < width - padding; x++)
                 {
+                    byte r = 0, g = 0, b = 0;
 
-                    int left = Math.Max(0, y - padding); // Левая граница
-                    int right = Math.Min((width * ppb) - 1, y + padding); // Правая граница
-                    int top = Math.Max(0, x - padding); // Верхняя граница
-                    int bottom = Math.Min(height - 1, x + padding); // Нижняя граница
-                    byte r=0, g=0, b = 0;
-
-                    for (int i = top, row= 0; i <= bottom; i++, row++)//x
+                    for (int i = -padding, row = 0; i <= padding; i++, row++)
                     {
-                        for (int j = left, column = 0; j <= right; j++, column++) //y
+                        for (int j = -padding, col = 0; j <= padding; j++, col++)
                         {
-                            double kernelCoef = kernel[row, column];
-                            int index = i * width * ppb + j;
+                            int pixelX = Math.Min(Math.Max(0, x + j), width - 1);
+                            int pixelY = Math.Min(Math.Max(0, y + i), height - 1);
 
-                            try
-                            {
-                                r += Convert.ToByte(Math.Max(0, Math.Min(255, kernelCoef * image[index])));
-                            }
-                            catch { }
+                            int index = (pixelY * width + pixelX) * ppb;
 
-                            try
-                            {
-                                g += Convert.ToByte(Math.Max(0, Math.Min(255, kernelCoef * image[index + 1])));
-                            }
-                            catch { }
-
-                            try
-                            {
-                                b += Convert.ToByte(Math.Max(0, Math.Min(255, kernelCoef * image[index + 2])));
-                            }
-                            catch { }
-
+                            r += Convert.ToByte(Math.Max(0, Math.Min(255, kernel[row, col] * image[index])));
+                            g += Convert.ToByte(Math.Max(0, Math.Min(255, kernel[row, col] * image[index + 1])));
+                            b += Convert.ToByte(Math.Max(0, Math.Min(255, kernel[row, col] * image[index + 2])));
                         }
                     }
 
-                    try
-                    {
-                        int outerIndex = (y * width + x) * ppb;
-                        image[outerIndex] = b;
-                        image[outerIndex + 1] = g;
-                        image[outerIndex + 2] = r;
-                    }catch (Exception) { }
+                    int outerIndex = (y * width + x) * ppb;
+                    image[outerIndex] = r;
+                    image[outerIndex + 1] = g;
+                    image[outerIndex + 2] = b;
                 }
             });
 
             return image;
         }
+
 
 
         public static byte[] ApplyLinearFilter2(byte[] image, int width, int height, string kernelString, int pixelSize)
