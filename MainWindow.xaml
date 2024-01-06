@@ -115,6 +115,7 @@
                 <ComboBoxItem Tag="1">LinearHarmonic</ComboBoxItem>
                 <ComboBoxItem Tag="2">Gaussian</ComboBoxItem>
                 <ComboBoxItem Tag="3">FastMedianHist</ComboBoxItem>
+                <ComboBoxItem Tag="4">ReccursiveMean</ComboBoxItem>
             </ComboBox>
             <TextBox x:Name="Kernel" AcceptsReturn="True" TextWrapping="Wrap">
                 1/9 1/9 1/9;1/9 1/9 1/9;1/9 1/9 1/9;

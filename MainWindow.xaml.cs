@@ -474,6 +474,7 @@ namespace ParallelPictureProcessing
             else if (ftype == 1) currImg = ImageNoiseAndFilteringExtensions.ApplyHarmonicMeanFilterParallel(currImg, Convert.ToInt32(Kernel.Text.Split(' ')[0]), Convert.ToInt32(Kernel.Text.Split(' ')[1]), width, height, 3, threads);
             else if (ftype == 2) currImg = ImageNoiseAndFilteringExtensions.Apply2DGaussianFilter(currImg, Utils.StringToDoubleArray(Kernel.Text), width, height, 3);
             else if (ftype == 3) currImg = ImageNoiseAndFilteringExtensions.ApplyLocalHistogrammFilter(currImg, width, height, 3, Convert.ToInt32(Kernel.Text), threads);
+            else if (ftype == 4) currImg = ImageNoiseAndFilteringExtensions.ApplyParallelRecursiveFilter(currImg, width, height, 3, Convert.ToInt32(Kernel.Text), threads);
 
             sw.Stop();
 
@@ -1284,6 +1285,58 @@ namespace ParallelPictureProcessing
             }
 
             return 0;
+        }
+
+        public static byte[] ApplyParallelRecursiveFilter(byte[] image, int width, int height, int pixelPerByte, int filterSize, int threads = 1)
+        {
+            int imageSize = image.Length;
+
+            Parallel.For(0, height, new ParallelOptions { MaxDegreeOfParallelism = threads }, y =>
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int index = (y * width + x) * pixelPerByte;
+                    double[] sum = new double[pixelPerByte];
+
+                    ApplyRecursiveFilter(image, width, height, pixelPerByte, filterSize, x, y, sum, 1);
+
+                    for (int i = 0; i < pixelPerByte; i++)
+                    {
+                        image[index + i] = (byte)(sum[i] / ((filterSize * 2 + 1) * (filterSize * 2 + 1)));
+                    }
+                }
+            });
+
+            return image;
+        }
+
+        private static void ApplyRecursiveFilter(byte[] image, int width, int height, int pixelPerByte, int filterSize, int x, int y, double[] sum, int recursionDepth)
+        {
+            if (recursionDepth <= 0)
+            {
+                int index = (y * width + x) * pixelPerByte;
+
+                for (int i = 0; i < pixelPerByte; i++)
+                {
+                    sum[i] += image[index + i];
+                }
+            }
+            else
+            {
+                for (int i = -filterSize; i <= filterSize; i++)
+                {
+                    for (int j = -filterSize; j <= filterSize; j++)
+                    {
+                        int newX = x + i;
+                        int newY = y + j;
+
+                        if (newX >= 0 && newX < width && newY >= 0 && newY < height)
+                        {
+                            ApplyRecursiveFilter(image, width, height, pixelPerByte, filterSize, newX, newY, sum, recursionDepth - 1);
+                        }
+                    }
+                }
+            }
         }
     }
 
