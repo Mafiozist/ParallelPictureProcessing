@@ -461,15 +461,36 @@ namespace ParallelPictureProcessing
             var index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content);
 
             int ftype = Convert.ToInt32((FilterType.SelectedItem as ComboBoxItem).Tag);
+            var currImg = picesOfYCbCrBytes[index];
 
-            //picesOfYCbCrBytes[index]= ImageNoiseAndFilteringExtensions.ApplyLinearFilter(picesOfYCbCrBytes[index], (int)original.Height, (int)original.Width, Kernel.Text, 3);
+            byte[] orig = new byte[currImg.Length];
+            Array.Copy(picesOfYCbCrBytes[index], orig, orig.Length);
 
-            if (ftype == 0) picesOfYCbCrBytes[index] = ImageNoiseAndFilteringExtensions.ApplyConvolutionFilterParallel(picesOfYCbCrBytes[index], Utils.StringToDoubleArray(Kernel.Text), (int)original.Width, (int)original.Height, 3, Convert.ToInt32(ThreadsCount.Value));
-            else if (ftype == 1) picesOfYCbCrBytes[index] = ImageNoiseAndFilteringExtensions.ApplyHarmonicMeanFilterParallel(picesOfYCbCrBytes[index], Convert.ToInt32(Kernel.Text.Split(' ')[0]), Convert.ToInt32(Kernel.Text.Split(' ')[1]), (int)original.Width, (int)original.Height, 3, Convert.ToInt32(ThreadsCount.Value));
+            int width = (int)original.Width, height = (int)original.Height;
+            int threads = Convert.ToInt32(ThreadsCount.Value);
+
+            Stopwatch sw = Stopwatch.StartNew();
+            if (ftype == 0) currImg = ImageNoiseAndFilteringExtensions.ApplyConvolutionFilterParallel(currImg, Utils.StringToDoubleArray(Kernel.Text), width, height, 3, threads);
+            else if (ftype == 1) currImg = ImageNoiseAndFilteringExtensions.ApplyHarmonicMeanFilterParallel(currImg, Convert.ToInt32(Kernel.Text.Split(' ')[0]), Convert.ToInt32(Kernel.Text.Split(' ')[1]), width, height, 3, threads);
+            else if (ftype == 2) currImg = ImageNoiseAndFilteringExtensions.Apply2DGaussianFilter(currImg, Utils.StringToDoubleArray(Kernel.Text), width, height, 3);
+            else if (ftype == 3) currImg = ImageNoiseAndFilteringExtensions.ApplyLocalHistogrammFilter(currImg, width, height, 3, Convert.ToInt32(Kernel.Text), threads);
+
+            sw.Stop();
+
+            Logs.Text += $"EstimatedFilteringTime: {sw.ElapsedMilliseconds}\n";
+            Logs.Text += $"DEL: {ImageNoiseAndFilteringExtensions.CalculateDelta(orig, currImg)}\n";
+            Logs.Text += $"MSAD: {ImageNoiseAndFilteringExtensions.CalculateMSAD(orig, currImg)}\n";
+            Logs.Text += $"MSE: {ImageNoiseAndFilteringExtensions.CalculateMSE(orig, currImg)}\n";
+
+            LogsRaw.Text += $"{sw.ElapsedMilliseconds}\n";
+            LogsRaw.Text += $"{ImageNoiseAndFilteringExtensions.CalculateDelta(orig, currImg)}\n";
+            LogsRaw.Text += $"{ImageNoiseAndFilteringExtensions.CalculateMSAD(orig, currImg)}\n";
+            LogsRaw.Text += $"{ImageNoiseAndFilteringExtensions.CalculateMSE(orig, currImg)}\n";
 
 
-            SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            SetTransformedImageFromBytes(currImg, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
         }
+
     }
 
     public class Utils
@@ -1126,6 +1147,144 @@ namespace ParallelPictureProcessing
             return image;
         }
 
+        public static byte[] Apply2DGaussianFilter(byte[] image, double[,] kernel, int imgWidth, int imgHeight, int pixelPerByte)
+        {
+            int kernelSize = kernel.GetLength(0);
+            int halfKernelSize = kernelSize / 2;
+
+            for (int i = 0; i < imgWidth; i++)
+            {
+                for (int j = 0; j < imgHeight; j++)
+                {
+                    double sumR = 0, sumG = 0, sumB = 0;
+
+                    for (int ki = 0; ki < kernelSize; ki++)
+                    {
+                        for (int kj = 0; kj < kernelSize; kj++)
+                        {
+                            int ni = i + ki - halfKernelSize;
+                            int nj = j + kj - halfKernelSize;
+
+                            if (ni >= 0 && ni < imgWidth && nj >= 0 && nj < imgHeight)
+                            {
+                                int index = (nj * imgWidth + ni) * pixelPerByte;
+
+                                sumR += image[index] * kernel[ki, kj];
+                                sumG += image[index + 1] * kernel[ki, kj];
+                                sumB += image[index + 2] * kernel[ki, kj];
+                            }
+                        }
+                    }
+
+                    int resultIndex = (j * imgWidth + i) * pixelPerByte;
+                    image[resultIndex] = (byte)sumR;
+                    image[resultIndex + 1] = (byte)sumG;
+                    image[resultIndex + 2] = (byte)sumB;
+                }
+            }
+
+            return image;
+        }
+
+
+        public static double CalculateDelta(byte[] original, byte[] filtered)
+        {
+            double delta = 0;
+
+            for (int i = 0; i < original.Length; i++)
+            {
+                delta += Math.Pow(original[i] - filtered[i], 2);
+            }
+
+            return Math.Sqrt(delta);
+        }
+
+        public static double CalculateMSE(byte[] original, byte[] filtered)
+        {
+            double mse = 0;
+
+            for (int i = 0; i < original.Length; i++)
+            {
+                mse += Math.Pow(original[i] - filtered[i], 2);
+            }
+
+            return mse / original.Length;
+        }
+
+        public static double CalculateMSAD(byte[] original, byte[] filtered)
+        {
+            double msad = 0;
+
+            for (int i = 0; i < original.Length; i++)
+            {
+                msad += Math.Abs(original[i] - filtered[i]);
+            }
+
+            return msad / original.Length;
+        }
+
+        public static byte[] ApplyLocalHistogrammFilter(byte[] image, int width, int height, int pixelPerByte, int filterSize, int threads = 1)
+        {
+            int imageSize = image.Length;
+
+            Parallel.For(0, height, new ParallelOptions { MaxDegreeOfParallelism = threads }, y =>
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int index = (y * width + x) * pixelPerByte;
+
+                    int[] histogramR = new int[256];
+                    int[] histogramG = new int[256];
+                    int[] histogramB = new int[256];
+
+                    // Собираем гистограммы
+                    for (int i = -filterSize; i <= filterSize; i++)
+                    {
+                        for (int j = -filterSize; j <= filterSize; j++)
+                        {
+                            int newX = x + i;
+                            int newY = y + j;
+
+                            if (newX >= 0 && newX < width && newY >= 0 && newY < height)
+                            {
+                                int neighborIndex = (newY * width + newX) * pixelPerByte;
+                                histogramR[image[neighborIndex]]++;
+                                histogramG[image[neighborIndex + 1]]++;
+                                histogramB[image[neighborIndex + 2]]++;
+                            }
+                        }
+                    }
+
+                    // Находим медианы
+                    byte medianR = FindMedian(histogramR);
+                    byte medianG = FindMedian(histogramG);
+                    byte medianB = FindMedian(histogramB);
+
+                    image[index] = medianR;
+                    image[index + 1] = medianG;
+                    image[index + 2] = medianB;
+                }
+            });
+
+            return image;
+        }
+
+        private static byte FindMedian(int[] histogram)
+        {
+            int sum = 0;
+            int medianIndex = histogram.Length / 2;
+
+            for (byte i = 0; i < histogram.Length; i++)
+            {
+                sum += histogram[i];
+                if (sum > medianIndex)
+                {
+                    return i;
+                }
+            }
+
+            return 0;
+        }
     }
 
     public class ColorType
