@@ -1098,18 +1098,18 @@ namespace ParallelPictureProcessing
                     double r = 0, g = 0, b = 0;
                     int count = 0;
 
-                    for (int i = -paddingY, row = 0; i <= paddingY; i++, row++)
+                    for (int i = 0, row = 0; i < maskHeight ; i++, row++)
                     {
-                        for (int j = -paddingX, col = 0; j <= paddingX; j++, col++)
+                        for (int j = 0, col = 0; j < maskWidth; j++, col++)
                         {
                             int pixelX = Math.Min(Math.Max(0, x + j), width - 1);
                             int pixelY = Math.Min(Math.Max(0, y + i), height - 1);
 
                             int index = (pixelY * width + pixelX) * ppb;
 
-                            r +=  (image[index]);  
-                            g +=  (image[index + 1]);
-                            b +=  (image[index + 2]);
+                            r +=  (1.0d / (image[index] == 0? 1 : image[index]));  
+                            g +=  (1.0d / (image[index +1] == 0? 1 : image[index +1]));
+                            b +=  (1.0d / (image[index +2] == 0? 1 : image[index +2]));
 
                             count++;
                         }
