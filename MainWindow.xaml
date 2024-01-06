@@ -109,6 +109,12 @@
             </StackPanel>
             <Button Click="AddMultyNoiseBtn_Click">Multy noise proc</Button>
 
+
+            <ComboBox x:Name="FilterType">
+                <ComboBoxItem Tag="0" IsSelected="True">LinearParalell</ComboBoxItem>
+                <ComboBoxItem Tag="1">LinearHarmonic</ComboBoxItem>
+                <ComboBoxItem Tag="2">Gaussian</ComboBoxItem>
+            </ComboBox>
             <TextBox x:Name="Kernel" AcceptsReturn="True" TextWrapping="Wrap">
                 1/9 1/9 1/9;1/9 1/9 1/9;1/9 1/9 1/9;
             </TextBox>

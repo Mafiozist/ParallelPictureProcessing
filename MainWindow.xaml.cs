@@ -460,8 +460,14 @@ namespace ParallelPictureProcessing
             if (picesOfYCbCrBytes == null || picesOfYCbCrBytes.Count == 0) return;
             var index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content);
 
+            int ftype = Convert.ToInt32((FilterType.SelectedItem as ComboBoxItem).Tag);
+
             //picesOfYCbCrBytes[index]= ImageNoiseAndFilteringExtensions.ApplyLinearFilter(picesOfYCbCrBytes[index], (int)original.Height, (int)original.Width, Kernel.Text, 3);
-            picesOfYCbCrBytes[index] = ImageNoiseAndFilteringExtensions.ApplyConvolutionFilterParallel(picesOfYCbCrBytes[index], Utils.StringToDoubleArray(Kernel.Text), (int)original.Width, (int)original.Height, 3, Convert.ToInt32(ThreadsCount.Value));
+
+            if (ftype == 0) picesOfYCbCrBytes[index] = ImageNoiseAndFilteringExtensions.ApplyConvolutionFilterParallel(picesOfYCbCrBytes[index], Utils.StringToDoubleArray(Kernel.Text), (int)original.Width, (int)original.Height, 3, Convert.ToInt32(ThreadsCount.Value));
+            else if (ftype == 1) picesOfYCbCrBytes[index] = ImageNoiseAndFilteringExtensions.ApplyHarmonicMeanFilterParallel(picesOfYCbCrBytes[index], Convert.ToInt32(Kernel.Text.Split(' ')[0]), Convert.ToInt32(Kernel.Text.Split(' ')[1]), (int)original.Width, (int)original.Height, 3, Convert.ToInt32(ThreadsCount.Value));
+
+
             SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
         }
     }
@@ -1080,8 +1086,47 @@ namespace ParallelPictureProcessing
             return image;
         }
 
+        public static byte[] ApplyHarmonicMeanFilterParallel(byte[] image, int maskWidth, int maskHeight, int width, int height, int ppb, int threads = 1)
+        {
+            int paddingX = (maskWidth - 1) / 2;
+            int paddingY = (maskHeight - 1) / 2;
 
-     }
+            Parallel.For(paddingY, height - paddingY, new ParallelOptions { MaxDegreeOfParallelism = threads }, y =>
+            {
+                for (int x = paddingX; x < width - paddingX; x++)
+                {
+                    double r = 0, g = 0, b = 0;
+                    int count = 0;
+
+                    for (int i = -paddingY, row = 0; i <= paddingY; i++, row++)
+                    {
+                        for (int j = -paddingX, col = 0; j <= paddingX; j++, col++)
+                        {
+                            int pixelX = Math.Min(Math.Max(0, x + j), width - 1);
+                            int pixelY = Math.Min(Math.Max(0, y + i), height - 1);
+
+                            int index = (pixelY * width + pixelX) * ppb;
+
+                            r +=  (image[index]);  
+                            g +=  (image[index + 1]);
+                            b +=  (image[index + 2]);
+
+                            count++;
+                        }
+                    }
+
+                    int outerIndex = (y * width + x) * ppb;
+
+                    image[outerIndex] = (byte)(count / r);
+                    image[outerIndex + 1] = (byte)(count / g);
+                    image[outerIndex + 2] = (byte)(count / b);
+                }
+            });
+
+            return image;
+        }
+
+    }
 
     public class ColorType
     {
