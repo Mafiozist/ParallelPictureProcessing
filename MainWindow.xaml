@@ -168,16 +168,16 @@
 
                     <TextBox x:Name="BinarizationVal"></TextBox>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button x:Name="GloabalBtn">Глобальная бинар</Button>
-                        <Button x:Name="LocalBtn">Локальная бинар</Button>
+                        <Button x:Name="GloabalBtn" Click="GloabalBtn_Click">Глобальная бинар</Button>
+                        <Button x:Name="LocalBtn" Click="LocalBtn_Click">Локальная бинар</Button>
                     </StackPanel>
 
                     <Separator Height="10"></Separator>
 
-                    <TextBox x:Name="MorphVal"></TextBox>
+                    <TextBox x:Name="MorphVal">1 1 0;1 1 1;1 1 1;</TextBox>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button x:Name="WiderBtn">Расширение</Button>
-                        <Button x:Name="LowerBtn">Сужение</Button>
+                        <Button x:Name="WiderBtn" Click="WiderBtn_Click">Расширение</Button>
+                        <Button x:Name="LowerBtn" Click="LowerBtn_Click">Сужение</Button>
                     </StackPanel>
 
                     <Separator Height="10"></Separator>

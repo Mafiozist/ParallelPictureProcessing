@@ -551,6 +551,7 @@ namespace ParallelPictureProcessing
                             width,
                             height,
                             3,
+                            threads,
                             Convert.ToDouble(PowerCoefTB.Text),
                             Convert.ToDouble(LimitCoefTB.Text)
                             );
@@ -564,6 +565,7 @@ namespace ParallelPictureProcessing
                             width,
                             height,
                             3,
+                            threads,
                             Convert.ToDouble(PowerCoefTB.Text),
                             Convert.ToDouble(LimitCoefTB.Text),
                             Convert.ToDouble(BalanceCoefTB.Text)
@@ -578,6 +580,7 @@ namespace ParallelPictureProcessing
                             width,
                             height,
                             3,
+                            threads,
                             Convert.ToDouble(PowerCoefTB.Text),
                             Convert.ToDouble(LimitCoefTB.Text),
                             Utils.StringToDoubleArray(BalanceCoefTB.Text)
@@ -618,6 +621,99 @@ namespace ParallelPictureProcessing
             BalanceCoefTB.Text = "0 -1 0;-1 -4 -1;0 -1 0;";
         }
 
+        private void GloabalBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (picesOfYCbCrBytes == null || picesOfYCbCrBytes.Count == 0) return;
+            var index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content);
+            int threads = Convert.ToInt32(ThreadsCount.Value);
+            int width = (int)original.Width, height = (int)original.Height;
+
+            try
+            {
+                picesOfYCbCrBytes[index] = EdgeDetection.GlobalThresholding(
+                picesOfYCbCrBytes[index],
+                width,
+                height,
+                3,
+                threads,
+                Convert.ToInt32(BinarizationVal.Text)
+                );
+            }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
+
+            SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb );
+        }
+
+       
+        private void LocalBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (picesOfYCbCrBytes == null || picesOfYCbCrBytes.Count == 0) return;
+            var index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content);
+            int threads = Convert.ToInt32(ThreadsCount.Value);
+            int width = (int)original.Width, height = (int)original.Height;
+
+            try
+            {
+                picesOfYCbCrBytes[index] = EdgeDetection.LocalNiblackThresholding(
+                picesOfYCbCrBytes[index],
+                width,
+                height,
+                3,
+                threads,
+                Convert.ToDouble(BinarizationVal.Text.Split(" ")[0]),
+                Convert.ToInt32(BinarizationVal.Text.Split(" ")[1])
+                );
+            }
+            catch(Exception ex) { MessageBox.Show(ex.Message); }
+
+            SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+        }
+
+        private void WiderBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (picesOfYCbCrBytes == null || picesOfYCbCrBytes.Count == 0) return;
+            var index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content);
+            int threads = Convert.ToInt32(ThreadsCount.Value);
+            int width = (int)original.Width, height = (int)original.Height;
+
+            try
+            {
+                picesOfYCbCrBytes[index] = EdgeDetection.Dilation(
+                picesOfYCbCrBytes[index],
+                width,
+                height,
+                3,
+                threads,
+                Utils.StringToDoubleArray(MorphVal.Text)
+                );
+            }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
+
+            SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+        }
+
+        private void LowerBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (picesOfYCbCrBytes == null || picesOfYCbCrBytes.Count == 0) return;
+            var index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content);
+            int threads = Convert.ToInt32(ThreadsCount.Value);
+            int width = (int)original.Width, height = (int)original.Height;
+
+            try
+            {
+                picesOfYCbCrBytes[index] = EdgeDetection.Erosion(
+                picesOfYCbCrBytes[index],
+                width,
+                height,
+                3,
+                threads,
+                Utils.StringToDoubleArray(MorphVal.Text)
+                );
+            }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
+
+            SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+        }
     }
 
     public class Utils
@@ -1531,11 +1627,11 @@ namespace ParallelPictureProcessing
     public static class EdgeDetection//lab3
     {
 
-        public static byte[] RobertsOperator(byte[] image, int width, int height, int ppb, double gain, double threshold)
+        public static byte[] RobertsOperator(byte[] image, int width, int height, int ppb, int threads, double gain, double threshold)
         {
             byte[] result = new byte[image.Length];
 
-            Parallel.For(0, height, y =>
+            Parallel.For(0, height, new ParallelOptions() { MaxDegreeOfParallelism = threads }, y =>
             {
                 for (int x = 0; x < width; x++)
                 {
@@ -1568,7 +1664,7 @@ namespace ParallelPictureProcessing
             return result;
         }
 
-        public static byte[] SobelOperator(byte[] image, int width, int height, int ppb, double gain, double threshold, double orientationCoeff)
+        public static byte[] SobelOperator(byte[] image, int width, int height, int ppb, int threads, double gain, double threshold, double orientationCoeff)
         {
             byte[] result = new byte[image.Length];
             int kernelSize = 3;
@@ -1577,7 +1673,7 @@ namespace ParallelPictureProcessing
             double[,] sobelKernelX = { { -1, 0, 1 }, { -2, 0, 2 }, { -1, 0, 1 } };
             double[,] sobelKernelY = { { -1, -2, -1 }, { 0, 0, 0 }, { 1, 2, 1 } };
 
-            Parallel.For(1, height - 1, y =>
+            Parallel.For(1, height - 1, new ParallelOptions() { MaxDegreeOfParallelism = threads }, y =>
             {
                 for (int x = 1; x < width - 1; x++)
                 {
@@ -1613,12 +1709,12 @@ namespace ParallelPictureProcessing
             return result;
         }
 
-        public static byte[] LaplaceOperator(byte[] image, int width, int height, int ppb, double gain, double threshold, double[,] laplaceKernel)
+        public static byte[] LaplaceOperator(byte[] image, int width, int height, int ppb,int threads, double gain, double threshold, double[,] laplaceKernel)
         {
             byte[] result = new byte[image.Length];
             int kernelSize = laplaceKernel.GetLength(0);
 
-            Parallel.For(1, height - 1, y =>
+            Parallel.For(1, height - 1, new ParallelOptions() { MaxDegreeOfParallelism = threads }, y =>
             {
                 for (int x = 1; x < width - 1; x++)
                 {
@@ -1643,6 +1739,145 @@ namespace ParallelPictureProcessing
                     result[index] = (byte)(Math.Abs(intensity) > threshold ? Math.Min(255, gain * Math.Abs(intensity)) : 0);
                     result[index + 1] = (byte)(Math.Abs(intensity) > threshold ? Math.Min(255, gain * Math.Abs(intensity)) : 0);
                     result[index + 2] = (byte)(Math.Abs(intensity) > threshold ? Math.Min(255, gain * Math.Abs(intensity)) : 0);
+                }
+            });
+
+            return result;
+        }
+
+        public static byte[] GlobalThresholding(byte[] image, int width, int height, int ppb,int threads,  int globalThreshold)
+        {
+            byte[] result = new byte[image.Length];
+
+            Parallel.For(0, height, new ParallelOptions() { MaxDegreeOfParallelism = threads }, y =>
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int index = (y * width + x) * ppb;
+
+                    // Глобальная бинаризация
+                    int intensity = (int)(0.299 * image[index] + 0.587 * image[index + 1] + 0.114 * image[index + 2]);
+                    byte binaryValue = (byte)(intensity > globalThreshold ? 255 : 0);
+
+                    // Применение результатов бинаризации
+                    result[index] = binaryValue;
+                    result[index + 1] = binaryValue;
+                    result[index + 2] = binaryValue;
+                }
+            });
+
+            return result;
+        }
+
+        public static byte[] LocalNiblackThresholding(byte[] image, int width, int height, int ppb, int threads,  double niblackK, int windowSize)
+        {
+            byte[] result = new byte[image.Length];
+
+            Parallel.For(0, height, new ParallelOptions() { MaxDegreeOfParallelism = threads }, y =>
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int index = (y * width + x) * ppb;
+
+                    // Локальная бинаризация (метод Ниблэка)
+                    int intensity = (int)(0.299 * image[index] + 0.587 * image[index + 1] + 0.114 * image[index + 2]);
+
+                    double localThreshold = 0;
+
+                    for (int i = -windowSize / 2; i <= windowSize / 2; i++)
+                    {
+                        for (int j = -windowSize / 2; j <= windowSize / 2; j++)
+                        {
+                            int neighborX = Math.Max(0, Math.Min(width - 1, x + j));
+                            int neighborY = Math.Max(0, Math.Min(height - 1, y + i));
+                            int neighborIndex = (neighborY * width + neighborX) * ppb;
+
+                            int neighborIntensity = (int)(0.299 * image[neighborIndex] + 0.587 * image[neighborIndex + 1] + 0.114 * image[neighborIndex + 2]);
+                            localThreshold += neighborIntensity;
+                        }
+                    }
+
+                    localThreshold /= (windowSize * windowSize);
+                    byte binaryValue = (byte)(intensity > localThreshold - niblackK ? 255 : 0);
+
+                    // Применение результатов бинаризации
+                    result[index] = binaryValue;
+                    result[index + 1] = binaryValue;
+                    result[index + 2] = binaryValue;
+                }
+            });
+
+            return result;
+        }
+
+        public static byte[] Dilation(byte[] image, int width, int height, int ppb, int threads, double[,] mask)
+        {
+            byte[] result = new byte[image.Length];
+
+            Parallel.For(0, height, new ParallelOptions() { MaxDegreeOfParallelism=threads }, y =>
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int index = (y * width + x) * ppb;
+
+                    int maxIntensity = 0;
+
+                    for (int i = 0; i < mask.GetLength(0); i++)
+                    {
+                        for (int j = 0; j < mask.GetLength(1); j++)
+                        {
+                            int neighborX = x + j - (mask.GetLength(1) - 1) / 2;
+                            int neighborY = y + i - (mask.GetLength(0) - 1) / 2;
+
+                            if (neighborX >= 0 && neighborX < width && neighborY >= 0 && neighborY < height)
+                            {
+                                int neighborIndex = (neighborY * width + neighborX) * ppb;
+                                int neighborIntensity = (int)(0.299 * image[neighborIndex] + 0.587 * image[neighborIndex + 1] + 0.114 * image[neighborIndex + 2]);
+                                maxIntensity = Math.Max(maxIntensity, neighborIntensity);
+                            }
+                        }
+                    }
+
+                    result[index] = (byte)maxIntensity;
+                    result[index + 1] = (byte)maxIntensity;
+                    result[index + 2] = (byte)maxIntensity;
+                }
+            });
+
+            return result;
+        }
+
+        public static byte[] Erosion(byte[] image, int width, int height, int ppb, int threads,  double[,] mask)
+        {
+            byte[] result = new byte[image.Length];
+
+            Parallel.For(0, height, new ParallelOptions() { MaxDegreeOfParallelism = threads }, y =>
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int index = (y * width + x) * ppb;
+
+                    int minIntensity = 255;
+
+                    for (int i = 0; i < mask.GetLength(0); i++)
+                    {
+                        for (int j = 0; j < mask.GetLength(1); j++)
+                        {
+                            int neighborX = x + j - (mask.GetLength(1) - 1) / 2;
+                            int neighborY = y + i - (mask.GetLength(0) - 1) / 2;
+
+                            if (neighborX >= 0 && neighborX < width && neighborY >= 0 && neighborY < height)
+                            {
+                                int neighborIndex = (neighborY * width + neighborX) * ppb;
+                                int neighborIntensity = (int)(0.299 * image[neighborIndex] + 0.587 * image[neighborIndex + 1] + 0.114 * image[neighborIndex + 2]);
+                                minIntensity = Math.Min(minIntensity, neighborIntensity);
+                            }
+                        }
+                    }
+
+                    result[index] = (byte)minIntensity;
+                    result[index + 1] = (byte)minIntensity;
+                    result[index + 2] = (byte)minIntensity;
                 }
             });
 
