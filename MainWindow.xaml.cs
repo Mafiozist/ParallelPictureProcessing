@@ -61,6 +61,7 @@ namespace ParallelPictureProcessing
         {
             InitializeComponent();
             DataContext = this;
+            this.WindowState = WindowState.Maximized;
         }
 
         private void SelectImage_Click(object sender, RoutedEventArgs e)
@@ -108,8 +109,9 @@ namespace ParallelPictureProcessing
             //LogsRaw.Text = "";
 
             var standardBitmapAndBytes = originalBmp.ToByte24BppRgbArray();
+            var val = Convert.ToInt32((ColorModelType.SelectedItem as ComboBoxItem).Tag);
 
-            switch (Convert.ToInt32((ColorModelType.SelectedItem as ComboBoxItem).Tag))
+            switch (val)
             {
                 default:
                 case 0:
@@ -122,7 +124,7 @@ namespace ParallelPictureProcessing
                     break;
 
 
-
+                case 3:
                 case 1:
                     picesOfHSV = standardBitmapAndBytes.Item1.ToHSVFormat();
                     var tasks = new Task[4];
@@ -142,13 +144,34 @@ namespace ParallelPictureProcessing
                         
                         foreach(var bytes in allBytes)
                         {
-                            picesOfYCbCrBytes.Add(bytes);
+                            if (val != 3) picesOfYCbCrBytes.Add(bytes);
+                            else picesOfYCbCrBytes.Add(allBytes[allBytes.Length-1]);
                         }
 
                         YCbCrBytes = picesOfYCbCrBytes[0];
+
                     }
                     catch(Exception err) { MessageBox.Show(err.Message); }
                     break;
+
+                    case 2:
+                        var rgb = standardBitmapAndBytes.Item1.SplitRGB();
+
+                        try {
+                            picesOfYCbCrBytes.Clear();
+                        }catch
+                        {
+                            picesOfYCbCrBytes = new List<byte[]>();
+                        }
+
+                        picesOfYCbCrBytes.Add(standardBitmapAndBytes.Item1);
+                        picesOfYCbCrBytes.Add(rgb.Item1);
+                        picesOfYCbCrBytes.Add(rgb.Item2);
+                        picesOfYCbCrBytes.Add(rgb.Item3);
+
+                        YCbCrBytes = standardBitmapAndBytes.Item1;
+                        break;
+
             }
 
             if (YCbCrBytes != null) SetTransformedImageFromBytes(YCbCrBytes, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
@@ -255,6 +278,7 @@ namespace ParallelPictureProcessing
             };
             ColorDiagramWindow colorDiagram = new ColorDiagramWindow(picesOfYCbCrBytes);
             colorDiagram.Show();
+            colorDiagram.WindowState = WindowState.Maximized;
         }
 
         private void Slider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -453,6 +477,13 @@ namespace ParallelPictureProcessing
                     encoder.Save(fs);
                 }
             }
+
+            var form = System.Drawing.Imaging.PixelFormat.Format24bppRgb;
+            var index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content);
+
+            DetailImageShow colorDiagram = new DetailImageShow(picesOfYCbCrBytes[index], (int)original.Width, (int)original.Height, form);
+            colorDiagram.Show();
+            colorDiagram.WindowState = WindowState.Maximized;
         }
 
         private void LinearFilter_Click(object sender, RoutedEventArgs e)
@@ -492,10 +523,86 @@ namespace ParallelPictureProcessing
             SetTransformedImageFromBytes(currImg, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
         }
 
+
+        private void originalImg_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            var form = System.Drawing.Imaging.PixelFormat.Format24bppRgb;
+            DetailImageShow colorDiagram = new DetailImageShow(originalBmp.ToByte24BppRgbArray().Item1, (int)original.Width, (int)original.Height, form);
+            colorDiagram.Show();
+            colorDiagram.WindowState = WindowState.Maximized;
+        }
+
+        private void Edging_Click(object sender, RoutedEventArgs e)
+        {
+            if (picesOfYCbCrBytes == null || picesOfYCbCrBytes.Count == 0) return;
+            var index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content);
+            int edgingType = Convert.ToInt32((EdgingType.SelectedItem as ComboBoxItem).Tag);
+            int threads =  Convert.ToInt32(ThreadsCount.Value);
+            int width = (int)original.Width, height = (int)original.Height;
+
+            try
+            {
+
+                switch (edgingType)
+                {
+                    case 0:
+                        picesOfYCbCrBytes[index] = EdgeDetection.RobertsOperator(
+                            picesOfYCbCrBytes[index],
+                            width,
+                            height,
+                            3,
+                            Convert.ToDouble(PowerCoefTB.Text),
+                            Convert.ToDouble(LimitCoefTB.Text)
+                            );
+
+
+                        break;
+
+
+
+                    default: return;
+                }
+
+                SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            }catch(Exception ex) { MessageBox.Show(ex.Message); }         
+        }
+
+        private void ProcessBtn_KeyDown(object sender, KeyEventArgs e)
+        {
+
+            switch (e.Key)
+            {
+                case Key.LeftCtrl:
+                    Process_Click(sender, e);
+                    break;
+
+                case Key.H:
+                    ShowHistogramm_Click(sender, e);
+                    break;
+
+            }
+        }
     }
 
     public class Utils
     {
+
+        public static byte[] ConvertToGrayscale(byte[] original)
+        {
+            byte[] grayscale = new byte[original.Length];
+
+            for (int i = 0; i < original.Length; i += 3)
+            {
+                int grayScale = (int)((original[i] * 0.3) + (original[i + 1] * 0.59) + (original[i + 2] * 0.11));
+                
+                grayscale[i] = (byte)grayScale;
+                grayscale[i+1] = (byte)grayScale;
+                grayscale[i+2] = (byte)grayScale;
+            }
+
+            return grayscale;
+        }
+
         public static void IncreaseChannelValue(ref List<byte[]> bytes, int channelIndex, int val)
         {
             if (bytes == null) return;
@@ -676,6 +783,37 @@ namespace ParallelPictureProcessing
             nBitmap.UnlockBits(btData);
 
             return nBitmap;
+        }
+
+        public static (byte[], byte[], byte[]) SplitRGB(this byte[] rgbData)
+        {
+            if (rgbData == null || rgbData.Length % 3 != 0)
+            {
+                throw new ArgumentException("Invalid RGB data.");
+            }
+
+
+            byte[] redChannel = new byte[rgbData.Length];
+            byte[] greenChannel = new byte[rgbData.Length];
+            byte[] blueChannel = new byte[rgbData.Length];
+            byte blank = 0;
+
+            for (int i = 0; i < rgbData.Length; i += 3)
+            {
+                redChannel[i] = rgbData[i];
+                redChannel[i + 1] = blank;
+                greenChannel[i + 2] = blank;
+
+                greenChannel[i] = blank;
+                greenChannel[i + 1] = rgbData[i+1];
+                greenChannel[i + 2] = blank;
+
+                blueChannel[i] = blank;
+                blueChannel[i + 1] = blank;
+                blueChannel[i + 2] = rgbData[i+2];
+            }
+
+            return (redChannel, greenChannel, blueChannel);
         }
 
         /// <summary>
@@ -1353,4 +1491,47 @@ namespace ParallelPictureProcessing
         public double V { get; set; }
     }
 
+
+    public static class EdgeDetection//lab3
+    {
+
+
+        public static byte[] RobertsOperator(byte[] image, int width, int height, int ppb, double gain, double threshold)
+        {
+            byte[] result = new byte[image.Length];
+
+            Parallel.For(0, height, y =>
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int index = (y * width + x) * ppb;
+
+                    // Игнорирование граничных пикселей
+                    if (x + 1 >= width || y + 1 >= height)
+                    {
+                        result[index] = 0;
+                        result[index + 1] = 0;
+                        result[index + 2] = 0;
+                    }
+                    else
+                    {
+                        double intensity1 = image[index];
+                        double intensity2 = image[index + ppb];
+                        double intensity3 = image[index + width * ppb];
+                        double intensity4 = image[index + (width + 1) * ppb];
+
+                        double gradient = Math.Abs(intensity1 - intensity4) + Math.Abs(intensity2 - intensity3);
+
+                        // Применение усиления и порогового значения
+                        result[index] = (byte)(gradient > threshold ? Math.Min(255, gain * gradient) : 0);
+                        result[index + 1] = (byte)(gradient > threshold ? Math.Min(255, gain * gradient) : 0);
+                        result[index + 2] = (byte)(gradient > threshold ? Math.Min(255, gain * gradient) : 0);
+                    }
+                }
+            });
+
+            return result;
+        }
+
+    }
 }

@@ -4,15 +4,15 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:lvc="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf" xmlns:local="clr-namespace:ParallelPictureProcessing"
         mc:Ignorable="d"
-        Title="MainWindow" Width="1520" Height="900" >
+        Title="MainWindow" Width="1520" Height="900" 
+        KeyDown="ProcessBtn_KeyDown">
     
     <Grid>
         
         
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width=".30*"/>
-            <ColumnDefinition Width=".04*"/>
-            <ColumnDefinition Width=".04*"/>
+            <ColumnDefinition Width=".15*"/>
             <ColumnDefinition Width=".30*"/>
         </Grid.ColumnDefinitions>
 
@@ -28,100 +28,175 @@
                 <Label x:Name="format" />
             </StackPanel>
             <Button Click="SelectImage_Click" Content="Select image" Height="26" Width="80" RenderOptions.BitmapScalingMode="HighQuality" Grid.Column="1"/>
-            <Image x:Name="originalImg" MinHeight="258" MinWidth="279" VerticalAlignment="Stretch"/>
+            <Image x:Name="originalImg" MinHeight="258" MinWidth="279" MouseDown="originalImg_MouseDown"  VerticalAlignment="Stretch"/>
         </StackPanel >
 
 
+        <TabControl Grid.Column="1">
+            <TabItem Header="Л1">
+                <StackPanel Orientation="Vertical" Grid.Row="0" >
+
+                    <ComboBox x:Name="ColorModelType" SelectionChanged="ColorModelType_SelectionChanged">
+                        <ComboBoxItem Tag="0" IsSelected="True">YCbCr</ComboBoxItem>
+                        <ComboBoxItem Tag="1">HSV</ComboBoxItem>
+                        <ComboBoxItem Tag="2">RGB</ComboBoxItem>
+                        <ComboBoxItem Tag="3">GREYSCALE</ComboBoxItem>
+                    </ComboBox>
+
+                    <Button x:Name="ProcessBtn"  Content="Process" KeyDown="ProcessBtn_KeyDown" Click="Process_Click" Width="48" VerticalAlignment="Center" Height="30" />
+                    <Button  Content="ShowHistogramm" Click="ShowHistogramm_Click" Width="48" VerticalAlignment="Center" Height="30"  />
+                    <ComboBox x:Name="ColorChannel" Visibility="Hidden">
+                        <ComboBoxItem IsSelected="True">0</ComboBoxItem>
+                        <ComboBoxItem>1</ComboBoxItem>
+                        <ComboBoxItem>2</ComboBoxItem>
+                    </ComboBox>
+
+                    <StackPanel Orientation="Horizontal">
+                        <Label >
+                            Ярк+=
+                        </Label>
+                        <Label x:Name="Brightness"/>
+                    </StackPanel>
+                    <Slider x:Name="BrightSlider" ValueChanged="Slider_ValueChanged" SmallChange="1" LargeChange="10" Minimum="-255" Maximum="255"  Value="0" />
+
+                    <StackPanel Orientation="Horizontal">
+                        <Label >
+                            Контр+=
+                        </Label>
+                        <Label x:Name="Contrast"/>
+                    </StackPanel>
+                    <Slider x:Name="ContrastSlider" ValueChanged="ContrastSlider_ValueChanged" Minimum="0.5" Maximum="2" LargeChange="1" SmallChange=".1" Value="1"/>
+
+                    <StackPanel>
+                        <Label>Потоков</Label>
+                        <Label x:Name="ThreadsCountLabel">Потоков</Label>
+                        <Slider x:Name="ThreadsCount" ValueChanged="ThreadsCount_ValueChanged" Minimum="1" SmallChange="1" LargeChange="5" Maximum="20"></Slider>
+                        <Label>Лог коэф</Label>
+                        <TextBox x:Name="LogCoef" IsEnabled="True"></TextBox>
+                        <Button Click="ParallelLogCorrectionProcess_Click">Лог преобр</Button>
+                    </StackPanel>
+
+                    <StackPanel>
+                        <Label>Точки</Label>
+                        <TextBox x:Name="coefVar"  TextWrapping="Wrap"/>
+                        <Button Click="ParallelCorrectionByIntensity_Click">Кусоч. преобр</Button>
+                        <Button Click="ParallelCorrectionByIntensityFromClear_Click">Кусоч. с нуля</Button>
+                    </StackPanel>
+
+                </StackPanel>
+            </TabItem>
+            <TabItem Header="Л2">
+                <StackPanel >
+                    <Label x:Name="NoiseLevelLabel">
+                        <Label.Content>
+                            <AccessText TextWrapping="Wrap" Text="Лаба2.Ур.зашумленности: {}%"/>
+                        </Label.Content>
+                    </Label>
+                    <CheckBox x:Name="RandomNoise" IsChecked="true">Рандом</CheckBox>
+                    <Slider x:Name="NoiseLevel" ValueChanged="NoiseLevel_ValueChanged" Minimum="0" SmallChange="1" LargeChange="5" Maximum="100"></Slider>
+                    <Label x:Name="WhiteToBlackPercentLabel">
+                        <Label.Content>
+                            <AccessText TextWrapping="Wrap" Text="Процент чкб:"/>
+                        </Label.Content>
+                    </Label>
+                    <Slider x:Name="WhiteToBlackPercent" ValueChanged="WhiteToBlackPercent_ValueChanged" Minimum="0" SmallChange="1" LargeChange="5" Maximum="100"></Slider>
+                    <Button x:Name="AddNoiseBtn" Click="AddNoiseBtn_Click">Noise process</Button>
+
+                    <Label>Макс откл</Label>
+                    <TextBox x:Name="maxAdditiveCoef"></TextBox>
+                    <Button Click="AddAdditiveNoiseBtn_Click">Additive noise proc</Button>
+
+                    <StackPanel Orientation="Horizontal">
+                        <TextBox x:Name="minMultyCoef" Width="47"></TextBox>
+                        <TextBox x:Name="maxMultyCoef" Width="47"></TextBox>
+                    </StackPanel>
+                    <Button Click="AddMultyNoiseBtn_Click">Multy noise proc</Button>
 
 
-        <StackPanel Orientation="Vertical" Grid.Column="1" Grid.Row="0" >
+                    <ComboBox x:Name="FilterType">
+                        <ComboBoxItem Tag="0" IsSelected="True">LinearParalell</ComboBoxItem>
+                        <ComboBoxItem Tag="1">LinearHarmonic</ComboBoxItem>
+                        <ComboBoxItem Tag="2">Gaussian</ComboBoxItem>
+                        <ComboBoxItem Tag="3">FastMedianHist</ComboBoxItem>
+                        <ComboBoxItem Tag="4">ReccursiveMean</ComboBoxItem>
+                    </ComboBox>
+                    <TextBox x:Name="Kernel" AcceptsReturn="True" TextWrapping="Wrap">
+                        1/9 1/9 1/9;
+1/9 1/9 1/9;
+1/9 1/9 1/9;
+                    </TextBox>
+                    <Button x:Name="LinearFilter" Click="LinearFilter_Click">Linear filter</Button>
+                </StackPanel>
+            </TabItem>
+            <TabItem Header="Л3">
+                <StackPanel Orientation="Vertical">
+                    <ComboBox x:Name="EdgingType">
+                        <ComboBoxItem IsSelected="True" Tag="0">
+                            Метод Робертса
+                        </ComboBoxItem>
+                        <ComboBoxItem Tag="1">
+                            Метод Собелла
+                        </ComboBoxItem>
+                        <ComboBoxItem Tag="2">
+                            Метод Лапласа
+                        </ComboBoxItem>
+                    </ComboBox>
 
-            <ComboBox x:Name="ColorModelType" SelectionChanged="ColorModelType_SelectionChanged">
-                <ComboBoxItem Tag="0" IsSelected="True">YCbCr</ComboBoxItem>
-                <ComboBoxItem Tag="1">HSV</ComboBoxItem>
-            </ComboBox>
+                    <Label>
+                        Порог знач
+                    </Label>
+                    <TextBox x:Name="LimitCoefTB"></TextBox>
 
-            <Button x:Name="ProcessBtn"  Content="Process" Click="Process_Click" Width="48" VerticalAlignment="Center" Height="30" />
-            <Button  Content="ShowHistogramm" Click="ShowHistogramm_Click" Width="48" VerticalAlignment="Center" Height="30"  />
-            <ComboBox x:Name="ColorChannel" Visibility="Hidden">
-                <ComboBoxItem IsSelected="True">0</ComboBoxItem>
-                <ComboBoxItem>1</ComboBoxItem>
-                <ComboBoxItem>2</ComboBoxItem>
-            </ComboBox>
+                    <Label>
+                        Коэф усил
+                    </Label>
+                    <TextBox x:Name="PowerCoefTB"></TextBox>
 
-            <StackPanel Orientation="Horizontal">
-                <Label >
-                    Ярк+= 
-                </Label>
-                <Label x:Name="Brightness"/>
-            </StackPanel>
-            <Slider x:Name="BrightSlider" ValueChanged="Slider_ValueChanged" SmallChange="1" LargeChange="10" Minimum="-255" Maximum="255"  Value="0" />
+                    <Label>
+                        Коэф баланс
+                    </Label>
+                    <TextBox x:Name="BalanceCoefTB"></TextBox>
+                    <Button x:Name="Edging" Click="Edging_Click">Контурирование</Button>
 
-            <StackPanel Orientation="Horizontal">
-                <Label >
-                 Контр+=
-                </Label>
-                <Label x:Name="Contrast"/>
-            </StackPanel>
-            <Slider x:Name="ContrastSlider" ValueChanged="ContrastSlider_ValueChanged" Minimum="0.5" Maximum="2" LargeChange="1" SmallChange=".1" Value="1"/>
+                    <Separator Height="10"></Separator>
 
-            <StackPanel>
-                <Label>Потоков</Label>
-                <Label x:Name="ThreadsCountLabel">Потоков</Label>
-                <Slider x:Name="ThreadsCount" ValueChanged="ThreadsCount_ValueChanged" Minimum="1" SmallChange="1" LargeChange="5" Maximum="20"></Slider>
-                <Label>Лог коэф</Label>
-                <TextBox x:Name="LogCoef" IsEnabled="True"></TextBox>
-                <Button Click="ParallelLogCorrectionProcess_Click">Лог преобр</Button>
-            </StackPanel>
+                    <TextBox x:Name="BinarizationVal"></TextBox>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button x:Name="GloabalBtn">Глобальная бинар</Button>
+                        <Button x:Name="LocalBtn">Локальная бинар</Button>
+                    </StackPanel>
 
-            <StackPanel>
-                <Label>Точки</Label>
-                <TextBox x:Name="coefVar"  TextWrapping="Wrap"/>
-                <Button Click="ParallelCorrectionByIntensity_Click">Кусоч. преобр</Button>
-                <Button Click="ParallelCorrectionByIntensityFromClear_Click">Кусоч. с нуля</Button>
-            </StackPanel>
- 
-        </StackPanel>
+                    <Separator Height="10"></Separator>
 
-        <StackPanel Grid.Column="2">
-            <Label x:Name="NoiseLevelLabel">
-                <Label.Content>
-                    <AccessText TextWrapping="Wrap" Text="Лаба2.Ур.зашумленности: {}%"/>
-                </Label.Content>
-            </Label>
-            <CheckBox x:Name="RandomNoise" IsChecked="true">Рандом</CheckBox>
-            <Slider x:Name="NoiseLevel" ValueChanged="NoiseLevel_ValueChanged" Minimum="0" SmallChange="1" LargeChange="5" Maximum="100"></Slider>
-            <Label x:Name="WhiteToBlackPercentLabel">
-                <Label.Content>
-                    <AccessText TextWrapping="Wrap" Text="Процент чкб:"/>
-                </Label.Content>
-            </Label>
-            <Slider x:Name="WhiteToBlackPercent" ValueChanged="WhiteToBlackPercent_ValueChanged" Minimum="0" SmallChange="1" LargeChange="5" Maximum="100"></Slider>
-            <Button x:Name="AddNoiseBtn" Click="AddNoiseBtn_Click">Noise process</Button>
+                    <TextBox x:Name="MorphVal"></TextBox>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button x:Name="WiderBtn">Расширение</Button>
+                        <Button x:Name="LowerBtn">Сужение</Button>
+                    </StackPanel>
 
-            <Label>Макс откл</Label>
-            <TextBox x:Name="maxAdditiveCoef"></TextBox>
-            <Button Click="AddAdditiveNoiseBtn_Click">Additive noise proc</Button>
+                    <Separator Height="10"></Separator>
+                    
+                    <ComboBox x:Name="SegmentationType">
+                        <ComboBoxItem Tag="0" IsSelected="True">                            Алгоритм на базе теории графов                        </ComboBoxItem>
+                        <ComboBoxItem Tag="1">
+                            Алгоритм разделения областей (принцип квадродерева)
+                        </ComboBoxItem>
+                    </ComboBox>
+                    <TextBox x:Name="SegmentationVal">
+                        
+                    </TextBox>
+                    <Button x:Name="Segmentation">
+                        Сегментировать
+                    </Button>
+                </StackPanel>
+            </TabItem>
+            <TabItem Header="Л4">
 
-            <StackPanel Orientation="Horizontal">
-                <TextBox x:Name="minMultyCoef" Width="47"></TextBox>
-                <TextBox x:Name="maxMultyCoef" Width="47"></TextBox>
-            </StackPanel>
-            <Button Click="AddMultyNoiseBtn_Click">Multy noise proc</Button>
+            </TabItem>
+        </TabControl>
 
-
-            <ComboBox x:Name="FilterType">
-                <ComboBoxItem Tag="0" IsSelected="True">LinearParalell</ComboBoxItem>
-                <ComboBoxItem Tag="1">LinearHarmonic</ComboBoxItem>
-                <ComboBoxItem Tag="2">Gaussian</ComboBoxItem>
-                <ComboBoxItem Tag="3">FastMedianHist</ComboBoxItem>
-                <ComboBoxItem Tag="4">ReccursiveMean</ComboBoxItem>
-            </ComboBox>
-            <TextBox x:Name="Kernel" AcceptsReturn="True" TextWrapping="Wrap">
-                1/9 1/9 1/9;1/9 1/9 1/9;1/9 1/9 1/9;
-            </TextBox>
-            <Button x:Name="LinearFilter" Click="LinearFilter_Click">Linear filter</Button>
-        </StackPanel>
+        
+     
         
         <StackPanel Orientation="Vertical"   Grid.Column="3" Margin="0 0 20 10" Grid.Row="0">
             <Label Content="Transformed" Height="23" Width="79"/>
