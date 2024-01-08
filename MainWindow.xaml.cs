@@ -558,7 +558,32 @@ namespace ParallelPictureProcessing
 
                         break;
 
+                    case 1:
+                        picesOfYCbCrBytes[index] = EdgeDetection.SobelOperator(
+                            picesOfYCbCrBytes[index],
+                            width,
+                            height,
+                            3,
+                            Convert.ToDouble(PowerCoefTB.Text),
+                            Convert.ToDouble(LimitCoefTB.Text),
+                            Convert.ToDouble(BalanceCoefTB.Text)
+                            );
 
+
+                        break;
+
+                    case 2:
+                        picesOfYCbCrBytes[index] = EdgeDetection.LaplaceOperator(
+                            picesOfYCbCrBytes[index],
+                            width,
+                            height,
+                            3,
+                            Convert.ToDouble(PowerCoefTB.Text),
+                            Convert.ToDouble(LimitCoefTB.Text),
+                            Utils.StringToDoubleArray(BalanceCoefTB.Text)
+                            );
+
+                        break;
 
                     default: return;
                 }
@@ -582,6 +607,17 @@ namespace ParallelPictureProcessing
 
             }
         }
+
+        private void PositiveKernel_Checked(object sender, RoutedEventArgs e)
+        {
+            BalanceCoefTB.Text = "0 1 0;1 -4 1;0 1 0;";
+        }
+
+        private void NegativeKernel_Checked(object sender, RoutedEventArgs e)
+        {
+            BalanceCoefTB.Text = "0 -1 0;-1 -4 -1;0 -1 0;";
+        }
+
     }
 
     public class Utils
@@ -1495,7 +1531,6 @@ namespace ParallelPictureProcessing
     public static class EdgeDetection//lab3
     {
 
-
         public static byte[] RobertsOperator(byte[] image, int width, int height, int ppb, double gain, double threshold)
         {
             byte[] result = new byte[image.Length];
@@ -1533,5 +1568,85 @@ namespace ParallelPictureProcessing
             return result;
         }
 
+        public static byte[] SobelOperator(byte[] image, int width, int height, int ppb, double gain, double threshold, double orientationCoeff)
+        {
+            byte[] result = new byte[image.Length];
+            int kernelSize = 3;
+
+            // Ядра Собеля для обработки по горизонтали и вертикали
+            double[,] sobelKernelX = { { -1, 0, 1 }, { -2, 0, 2 }, { -1, 0, 1 } };
+            double[,] sobelKernelY = { { -1, -2, -1 }, { 0, 0, 0 }, { 1, 2, 1 } };
+
+            Parallel.For(1, height - 1, y =>
+            {
+                for (int x = 1; x < width - 1; x++)
+                {
+                    int index = (y * width + x) * ppb;
+
+                    double intensityX = 0;
+                    double intensityY = 0;
+
+                    // Применение ядра Собеля по горизонтали
+                    for (int i = 0; i < kernelSize; i++)
+                    {
+                        for (int j = 0; j < kernelSize; j++)
+                        {
+                            int imageX = x + j - 1;
+                            int imageY = y + i - 1;
+                            int imageIndex = (imageY * width + imageX) * ppb;
+
+                            intensityX += sobelKernelX[i, j] * image[imageIndex];
+                            intensityY += sobelKernelY[i, j] * image[imageIndex];
+                        }
+                    }
+
+                    // Вычисление градиента
+                    double gradient = Math.Sqrt(Math.Pow(intensityX, 2) + Math.Pow(orientationCoeff * intensityY, 2));
+
+                    // Применение усиления и порогового значения
+                    result[index] = (byte)(gradient > threshold ? Math.Min(255, gain * gradient) : 0);
+                    result[index + 1] = (byte)(gradient > threshold ? Math.Min(255, gain * gradient) : 0);
+                    result[index + 2] = (byte)(gradient > threshold ? Math.Min(255, gain * gradient) : 0);
+                }
+            });
+
+            return result;
+        }
+
+        public static byte[] LaplaceOperator(byte[] image, int width, int height, int ppb, double gain, double threshold, double[,] laplaceKernel)
+        {
+            byte[] result = new byte[image.Length];
+            int kernelSize = laplaceKernel.GetLength(0);
+
+            Parallel.For(1, height - 1, y =>
+            {
+                for (int x = 1; x < width - 1; x++)
+                {
+                    int index = (y * width + x) * ppb;
+
+                    double intensity = 0;
+
+                    // Применение ядра Лапласа
+                    for (int i = 0; i < kernelSize; i++)
+                    {
+                        for (int j = 0; j < kernelSize; j++)
+                        {
+                            int imageX = x + j - (kernelSize - 1) / 2;
+                            int imageY = y + i - (kernelSize - 1) / 2;
+                            int imageIndex = (imageY * width + imageX) * ppb;
+
+                            intensity += laplaceKernel[i, j] * image[imageIndex];
+                        }
+                    }
+
+                    // Применение усиления и порогового значения
+                    result[index] = (byte)(Math.Abs(intensity) > threshold ? Math.Min(255, gain * Math.Abs(intensity)) : 0);
+                    result[index + 1] = (byte)(Math.Abs(intensity) > threshold ? Math.Min(255, gain * Math.Abs(intensity)) : 0);
+                    result[index + 2] = (byte)(Math.Abs(intensity) > threshold ? Math.Min(255, gain * Math.Abs(intensity)) : 0);
+                }
+            });
+
+            return result;
+        }
     }
 }

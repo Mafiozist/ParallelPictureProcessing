@@ -130,7 +130,7 @@
             </TabItem>
             <TabItem Header="Л3">
                 <StackPanel Orientation="Vertical">
-                    <ComboBox x:Name="EdgingType">
+                    <ComboBox x:Name="EdgingType" >
                         <ComboBoxItem IsSelected="True" Tag="0">
                             Метод Робертса
                         </ComboBoxItem>
@@ -155,6 +155,12 @@
                     <Label>
                         Коэф баланс
                     </Label>
+
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="PositiveKernel" Checked="PositiveKernel_Checked" GroupName="Kernel">Положит ядро</RadioButton>
+                        <RadioButton x:Name="NegativeKernel"  Checked="NegativeKernel_Checked" GroupName="Kernel">Отриц ядро</RadioButton>
+                    </StackPanel>
+                    
                     <TextBox x:Name="BalanceCoefTB"></TextBox>
                     <Button x:Name="Edging" Click="Edging_Click">Контурирование</Button>
 
