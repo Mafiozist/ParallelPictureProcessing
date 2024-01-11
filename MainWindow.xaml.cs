@@ -42,13 +42,19 @@ using Iced.Intel;
 using Perfolizer.Mathematics.RangeEstimators;
 using System.Data;
 using System.Windows.Media.Media3D;
+using System.Numerics;
+using System;
+using MathNet.Numerics;
+using MathNet.Numerics.LinearAlgebra;
+using MathNet.Numerics.LinearAlgebra.Factorization;
+using MathNet.Numerics.Statistics;
 
 namespace ParallelPictureProcessing
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class MainWindow : System.Windows.Window
     {
         BitmapImage original;
         Bitmap originalBmp;
@@ -85,7 +91,7 @@ namespace ParallelPictureProcessing
                 bImage.BeginInit();
                 bImage.UriSource = file;
                 bImage.CacheOption = BitmapCacheOption.OnLoad;
-                bImage.CreateOptions= BitmapCreateOptions.PreservePixelFormat | BitmapCreateOptions.IgnoreImageCache;
+                bImage.CreateOptions = BitmapCreateOptions.PreservePixelFormat | BitmapCreateOptions.IgnoreImageCache;
                 bImage.EndInit();
                 original = bImage;
 
@@ -100,10 +106,10 @@ namespace ParallelPictureProcessing
         private void Process_Click(object sender, RoutedEventArgs e)
         {
             if (original is null) return;
-            
+
             BrightSlider.Value = 0;
             ContrastSlider.Value = 1;
-            NoiseLevel.Value = 0;
+            //NoiseLevel.Value = 0;
             SelectedChannel.SelectedIndex = 0;
             Logs.Text = "";
             //LogsRaw.Text = "";
@@ -134,43 +140,43 @@ namespace ParallelPictureProcessing
 
                     var res = Parallel.For(0, picesOfHSV.Count, i =>
                     {
-                        if(i == 0 || i == 1) tasks[i] = Task.Run(() => allBytes[i] = picesOfHSV[i].ToColorBytesFromHSV());
+                        if (i == 0 || i == 1) tasks[i] = Task.Run(() => allBytes[i] = picesOfHSV[i].ToColorBytesFromHSV());
                         else tasks[i] = Task.Run(() => allBytes[i] = picesOfHSV[i].ToBytesFromHSV());
                     });
-                          
+
                     try
                     {
                         Task.WaitAll(tasks);
-                        
-                        foreach(var bytes in allBytes)
+
+                        foreach (var bytes in allBytes)
                         {
                             if (val != 3) picesOfYCbCrBytes.Add(bytes);
-                            else picesOfYCbCrBytes.Add(allBytes[allBytes.Length-1]);
+                            else picesOfYCbCrBytes.Add(allBytes[allBytes.Length - 1]);
                         }
 
                         YCbCrBytes = picesOfYCbCrBytes[0];
 
                     }
-                    catch(Exception err) { MessageBox.Show(err.Message); }
+                    catch (Exception err) { MessageBox.Show(err.Message); }
                     break;
 
-                    case 2:
-                        var rgb = standardBitmapAndBytes.Item1.SplitRGB();
+                case 2:
+                    var rgb = standardBitmapAndBytes.Item1.SplitRGB();
 
-                        try {
-                            picesOfYCbCrBytes.Clear();
-                        }catch
-                        {
-                            picesOfYCbCrBytes = new List<byte[]>();
-                        }
+                    try {
+                        picesOfYCbCrBytes.Clear();
+                    } catch
+                    {
+                        picesOfYCbCrBytes = new List<byte[]>();
+                    }
 
-                        picesOfYCbCrBytes.Add(standardBitmapAndBytes.Item1);
-                        picesOfYCbCrBytes.Add(rgb.Item1);
-                        picesOfYCbCrBytes.Add(rgb.Item2);
-                        picesOfYCbCrBytes.Add(rgb.Item3);
+                    picesOfYCbCrBytes.Add(standardBitmapAndBytes.Item1);
+                    picesOfYCbCrBytes.Add(rgb.Item1);
+                    picesOfYCbCrBytes.Add(rgb.Item2);
+                    picesOfYCbCrBytes.Add(rgb.Item3);
 
-                        YCbCrBytes = standardBitmapAndBytes.Item1;
-                        break;
+                    YCbCrBytes = standardBitmapAndBytes.Item1;
+                    break;
 
             }
 
@@ -218,7 +224,7 @@ namespace ParallelPictureProcessing
             SetTransformedImageFromBytes(picesOfYCbCrBytes[0], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
         }
 
-        public void AddLogs(string method,string text, string rawVal)
+        public void AddLogs(string method, string text, string rawVal)
         {
             var nString = $"Message from {method}: {text};\n";
             StringBuilder sb = new StringBuilder(Logs.Text);
@@ -237,7 +243,7 @@ namespace ParallelPictureProcessing
             {
                 transformedImg.Source = Imaging.CreateBitmapSourceFromHBitmap(bytes.ToBitmap((int)original.Width, (int)original.Height, format).GetHbitmap(), IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
             }
-            catch (Exception ex){ MessageBox.Show(ex.Message); }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void Revert_Click(object sender, RoutedEventArgs e)
@@ -381,7 +387,7 @@ namespace ParallelPictureProcessing
 
             if (Convert.ToInt32(((sender as ComboBox).SelectedItem as ComboBoxItem).Tag) == 0)
             {
-                picesOfHSV = null; 
+                picesOfHSV = null;
                 return;
             }
         }
@@ -389,10 +395,10 @@ namespace ParallelPictureProcessing
         //Лаба2
         private void NoiseLevel_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            var textContent=(NoiseLevelLabel.Content as AccessText);
-            var sliderVal=(int) (sender as Slider).Value;
-            textContent.Text=textContent.Text.Remove(textContent.Text.IndexOf(':') + 1);
-            textContent.Text+=$"{sliderVal}%";
+            var textContent = (NoiseLevelLabel.Content as AccessText);
+            var sliderVal = (int)(sender as Slider).Value;
+            textContent.Text = textContent.Text.Remove(textContent.Text.IndexOf(':') + 1);
+            textContent.Text += $"{sliderVal}%";
         }
 
         private void AddNoiseBtn_Click(object sender, RoutedEventArgs e)
@@ -501,11 +507,15 @@ namespace ParallelPictureProcessing
             int threads = Convert.ToInt32(ThreadsCount.Value);
 
             Stopwatch sw = Stopwatch.StartNew();
-            if (ftype == 0) currImg = ImageNoiseAndFilteringExtensions.ApplyConvolutionFilterParallel(currImg, Utils.StringToDoubleArray(Kernel.Text), width, height, 3, threads);
-            else if (ftype == 1) currImg = ImageNoiseAndFilteringExtensions.ApplyHarmonicMeanFilterParallel(currImg, Convert.ToInt32(Kernel.Text.Split(' ')[0]), Convert.ToInt32(Kernel.Text.Split(' ')[1]), width, height, 3, threads);
-            else if (ftype == 2) currImg = ImageNoiseAndFilteringExtensions.Apply2DGaussianFilter(currImg, Utils.StringToDoubleArray(Kernel.Text), width, height, 3);
-            else if (ftype == 3) currImg = ImageNoiseAndFilteringExtensions.ApplyLocalHistogrammFilter(currImg, width, height, 3, Convert.ToInt32(Kernel.Text), threads);
-            else if (ftype == 4) currImg = ImageNoiseAndFilteringExtensions.ApplyParallelRecursiveFilter(currImg, width, height, 3, Convert.ToInt32(Kernel.Text), threads);
+
+            try
+            {
+                if (ftype == 0) currImg = ImageNoiseAndFilteringExtensions.ApplyConvolutionFilterParallel(currImg, Utils.StringToDoubleArray(Kernel.Text), width, height, 3, threads);
+                else if (ftype == 1) currImg = ImageNoiseAndFilteringExtensions.ApplyHarmonicMeanFilterParallel(currImg, Convert.ToInt32(Kernel.Text.Split(' ')[0]), Convert.ToInt32(Kernel.Text.Split(' ')[1]), width, height, 3, threads);
+                else if (ftype == 2) currImg = ImageNoiseAndFilteringExtensions.Apply2DGaussianFilter(currImg, Utils.StringToDoubleArray(Kernel.Text), width, height, 3, threads);
+                else if (ftype == 3) currImg = ImageNoiseAndFilteringExtensions.ApplyLocalHistogrammFilter(currImg, width, height, 3, Convert.ToInt32(Kernel.Text), threads);
+                else if (ftype == 4) currImg = ImageNoiseAndFilteringExtensions.ApplyParallelRecursiveFilter(currImg, width, height, 3, Convert.ToInt32(Kernel.Text), threads);
+            } catch (Exception ex) { MessageBox.Show(ex.Message); }
 
             sw.Stop();
 
@@ -515,12 +525,12 @@ namespace ParallelPictureProcessing
             Logs.Text += $"MSE: {ImageNoiseAndFilteringExtensions.CalculateMSE(orig, currImg)}\n";
 
             LogsRaw.Text += $"{sw.ElapsedMilliseconds}\n";
-            LogsRaw.Text += $"{ImageNoiseAndFilteringExtensions.CalculateDelta(orig, currImg)}\n";
-            LogsRaw.Text += $"{ImageNoiseAndFilteringExtensions.CalculateMSAD(orig, currImg)}\n";
-            LogsRaw.Text += $"{ImageNoiseAndFilteringExtensions.CalculateMSE(orig, currImg)}\n";
+            FilterLogsRaw.Text += $"{ImageNoiseAndFilteringExtensions.CalculateDelta(orig, currImg)}\n";
+            FilterLogsRaw.Text += $"{ImageNoiseAndFilteringExtensions.CalculateMSAD(orig, currImg)}\n";
+            FilterLogsRaw.Text += $"{ImageNoiseAndFilteringExtensions.CalculateMSE(orig, currImg)}\n";
 
-
-            SetTransformedImageFromBytes(currImg, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            picesOfYCbCrBytes[index] = currImg;
+            SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
         }
 
 
@@ -537,7 +547,7 @@ namespace ParallelPictureProcessing
             if (picesOfYCbCrBytes == null || picesOfYCbCrBytes.Count == 0) return;
             var index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content);
             int edgingType = Convert.ToInt32((EdgingType.SelectedItem as ComboBoxItem).Tag);
-            int threads =  Convert.ToInt32(ThreadsCount.Value);
+            int threads = Convert.ToInt32(ThreadsCount.Value);
             int width = (int)original.Width, height = (int)original.Height;
 
             try
@@ -592,7 +602,7 @@ namespace ParallelPictureProcessing
                 }
 
                 SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
-            }catch(Exception ex) { MessageBox.Show(ex.Message); }         
+            } catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void ProcessBtn_KeyDown(object sender, KeyEventArgs e)
@@ -641,10 +651,10 @@ namespace ParallelPictureProcessing
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
 
-            SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb );
+            SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
         }
 
-       
+
         private void LocalBtn_Click(object sender, RoutedEventArgs e)
         {
             if (picesOfYCbCrBytes == null || picesOfYCbCrBytes.Count == 0) return;
@@ -664,7 +674,7 @@ namespace ParallelPictureProcessing
                 Convert.ToInt32(BinarizationVal.Text.Split(" ")[1])
                 );
             }
-            catch(Exception ex) { MessageBox.Show(ex.Message); }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
 
             SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
         }
@@ -714,6 +724,26 @@ namespace ParallelPictureProcessing
 
             SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
         }
+
+        private void Segmentation_Click(object sender, RoutedEventArgs e)
+        {
+            if (picesOfYCbCrBytes == null || picesOfYCbCrBytes.Count == 0) return;
+            var index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content);
+            int threads = Convert.ToInt32(ThreadsCount.Value);
+            int width = (int)original.Width, height = (int)original.Height;
+
+        }
+
+        private void FindLines_Click(object sender, RoutedEventArgs e)
+        {
+            if (picesOfYCbCrBytes == null || picesOfYCbCrBytes.Count == 0) return;
+            var index = Convert.ToInt32((SelectedChannel.SelectedItem as ComboBoxItem).Content);
+            int threads = Convert.ToInt32(ThreadsCount.Value);
+            int width = (int)original.Width, height = (int)original.Height;
+
+            picesOfYCbCrBytes[index]= TextureLab.DetectShapes(picesOfYCbCrBytes[index], width, height, 3, threads, "line");
+            SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+        }
     }
 
     public class Utils
@@ -726,10 +756,10 @@ namespace ParallelPictureProcessing
             for (int i = 0; i < original.Length; i += 3)
             {
                 int grayScale = (int)((original[i] * 0.3) + (original[i + 1] * 0.59) + (original[i + 2] * 0.11));
-                
+
                 grayscale[i] = (byte)grayScale;
-                grayscale[i+1] = (byte)grayScale;
-                grayscale[i+2] = (byte)grayScale;
+                grayscale[i + 1] = (byte)grayScale;
+                grayscale[i + 2] = (byte)grayScale;
             }
 
             return grayscale;
@@ -741,7 +771,7 @@ namespace ParallelPictureProcessing
 
             lock (bytes)
             {
-                for (int i=0; i < bytes[channelIndex].Length; ++i)
+                for (int i = 0; i < bytes[channelIndex].Length; ++i)
                 {
                     bytes[channelIndex][i] = (byte)Math.Max(0, Math.Min(255, bytes[channelIndex][i] + val));
                 }
@@ -765,18 +795,18 @@ namespace ParallelPictureProcessing
                     for (int d = 0; d < points.Length; ++d)
                     {
                         //Previous points
-                        byte prevX = (byte)(d == 0 ? 0 : Math.Max(0, Math.Min(255, Convert.ToInt32(points[d - 1].Split(',')[0])))); 
-                        byte prevY = (byte)(d == 0 ? 0 : Math.Max(0, Math.Min(255, Convert.ToInt32(points[d-1].Split(',')[1]))));
+                        byte prevX = (byte)(d == 0 ? 0 : Math.Max(0, Math.Min(255, Convert.ToInt32(points[d - 1].Split(',')[0]))));
+                        byte prevY = (byte)(d == 0 ? 0 : Math.Max(0, Math.Min(255, Convert.ToInt32(points[d - 1].Split(',')[1]))));
 
                         //Current points
-                        byte x = (byte) Math.Max(0, Math.Min(255,Convert.ToInt32(points[d].Split(',')[0])));
-                        byte y = (byte) Math.Max(0, Math.Min(255, Convert.ToInt32(points[d].Split(',')[1])));
+                        byte x = (byte)Math.Max(0, Math.Min(255, Convert.ToInt32(points[d].Split(',')[0])));
+                        byte y = (byte)Math.Max(0, Math.Min(255, Convert.ToInt32(points[d].Split(',')[1])));
 
                         //Если значение входит в текущий диапазон перобразований
                         if (nBytes[i] > prevX && nBytes[i] < x) {
 
-                            double k = (double) (y - prevY) / (x - prevX); //Вычисляем угол наклона k
-                            double b = (double) y - (k * x);//Вычисляем смещение b
+                            double k = (double)(y - prevY) / (x - prevX); //Вычисляем угол наклона k
+                            double b = (double)y - (k * x);//Вычисляем смещение b
                             nBytes[i] = (byte)Math.Max(0, Math.Min(255, k * nBytes[i] + b));
 
                             break;
@@ -822,7 +852,7 @@ namespace ParallelPictureProcessing
             string[] rows = input.Split(';');
 
             // Определение размерности массива
-            int rowCount = rows.Length-1;
+            int rowCount = rows.Length - 1;
             int colCount = rows[0].Split(' ').Length;
 
             // Создание двумерного массива
@@ -855,7 +885,7 @@ namespace ParallelPictureProcessing
                         }
                     }
                 }
-            }catch (Exception ex) { MessageBox.Show(ex.Message); }
+            } catch (Exception ex) { MessageBox.Show(ex.Message); }
 
             return result;
         }
@@ -889,7 +919,7 @@ namespace ParallelPictureProcessing
             return new Tuple<byte[], Bitmap>(bytes, nBitmap);
         }
 
-        public static Bitmap ToBitmap24BppRgb(this byte[] bytes,  System.Drawing.Image image)
+        public static Bitmap ToBitmap24BppRgb(this byte[] bytes, System.Drawing.Image image)
         {
             var nBitmap = new Bitmap(image.Width, image.Height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
 
@@ -937,12 +967,12 @@ namespace ParallelPictureProcessing
                 greenChannel[i + 2] = blank;
 
                 greenChannel[i] = blank;
-                greenChannel[i + 1] = rgbData[i+1];
+                greenChannel[i + 1] = rgbData[i + 1];
                 greenChannel[i + 2] = blank;
 
                 blueChannel[i] = blank;
                 blueChannel[i + 1] = blank;
-                blueChannel[i + 2] = rgbData[i+2];
+                blueChannel[i + 2] = rgbData[i + 2];
             }
 
             return (redChannel, greenChannel, blueChannel);
@@ -960,7 +990,7 @@ namespace ParallelPictureProcessing
             var CbBytes = new byte[nBytes.Length];
             var CrBytes = new byte[nBytes.Length];
 
-            for (int i = 0; i < oBytes.Length; i+=3 )//8 - a, 8 - b, 8 - r, 8 - g
+            for (int i = 0; i < oBytes.Length; i += 3)//8 - a, 8 - b, 8 - r, 8 - g
             {
                 byte r = 0, g = 0, b = 0, empty = 128;
 
@@ -976,25 +1006,25 @@ namespace ParallelPictureProcessing
                 Cb = Math.Max(0, Math.Min(255, Cb));
                 Cr = Math.Max(0, Math.Min(255, Cr));
 
-                try { 
-                    nBytes[i] = (byte)Y; 
+                try {
+                    nBytes[i] = (byte)Y;
                     YBytes[i] = (byte)Y;
                     CrBytes[i] = empty;
                     CbBytes[i] = empty;
                 } catch { }
 
-                try { 
-                    nBytes[i + 1] = (byte) Cb;
-                    CbBytes[i + 1] = (byte) Cb;
+                try {
+                    nBytes[i + 1] = (byte)Cb;
+                    CbBytes[i + 1] = (byte)Cb;
                     YBytes[i + 1] = (byte)Y;
                     CrBytes[i + 1] = empty;
                 } catch { }
 
-                try { 
-                    nBytes[i + 2] = (byte) Cr;
-                    CrBytes[i + 2] = (byte) Cr;
+                try {
+                    nBytes[i + 2] = (byte)Cr;
+                    CrBytes[i + 2] = (byte)Cr;
                     CbBytes[i + 2] = empty;
-                    YBytes[i + 2] = (byte)Y; 
+                    YBytes[i + 2] = (byte)Y;
                 } catch { }
 
             }
@@ -1011,7 +1041,7 @@ namespace ParallelPictureProcessing
     public static class ImageNoiseAndFilteringExtensions
     {
         volatile static int CountOfNoises = 0;
-        volatile static Dictionary<int, bool> randomIndecies = new (); 
+        public volatile static Dictionary<int, bool> randomIndecies = new();
 
         public static byte[] AddImpulseNoise(ref List<byte[]> bytes, int channelIndex, int percent, int threadsNum, int blackPercent, bool random)
         {
@@ -1026,8 +1056,8 @@ namespace ParallelPictureProcessing
                 MaxDegreeOfParallelism = threadsNum,
                 CancellationToken = ct.Token,
             };
-            
-            var noises = (int) Math.Round((random? curBytes.Length : curBytes.Length / 3) * (percent / 100d));
+
+            var noises = (int)Math.Round((random ? curBytes.Length : curBytes.Length / 3) * (percent / 100d));
             var blackCount = Convert.ToInt32(((blackPercent / 100d)) * noises);
             var whiteCount = noises - blackCount;
             if (random) GenerateRandomIndices(curBytes.Length, noises, threadsNum);
@@ -1037,14 +1067,14 @@ namespace ParallelPictureProcessing
                 try
                 {
                     bool isWhite = true;
-                    for(int i = 0; i < curBytes.Length; i+=3)
+                    for (int i = 0; i < curBytes.Length; i += 3)
                     {
                         if (random)
                         {
                             if (randomIndecies.ContainsKey(i) && blackCount > 0 && isWhite || randomIndecies.ContainsKey(i) && blackCount > 0 && whiteCount <= 0)//i % 2 == 0 && 
                             {
                                 curBytes[i] = 255;
-                                curBytes[i+1] = 255;
+                                curBytes[i + 1] = 255;
                                 curBytes[i + 2] = 255;
                                 isWhite = false;
                                 --whiteCount;
@@ -1100,10 +1130,10 @@ namespace ParallelPictureProcessing
             }
 
             Random rand = new Random();
-            randomIndecies = new ();
+            randomIndecies = new();
 
             CancellationTokenSource ct = new CancellationTokenSource();
-            ParallelOptions options = new ParallelOptions() { MaxDegreeOfParallelism = tNum, CancellationToken = ct.Token };
+            ParallelOptions options = new ParallelOptions() { MaxDegreeOfParallelism = 1, CancellationToken = ct.Token };
 
             try
             {
@@ -1120,8 +1150,10 @@ namespace ParallelPictureProcessing
                     if (randomIndecies.Count == n) ct.Cancel();
                 });
             }
-            catch (Exception ex) { MessageBox.Show(ex.Message); }
-            
+            catch (Exception ex) {
+                if (!ct.IsCancellationRequested) MessageBox.Show(ex.Message);
+            }
+
         }
 
         public static byte[] AddMultyNoise(ref List<byte[]> bytes, int channelIndex, double minCoef, double maxCoef, int threadsNum)
@@ -1150,7 +1182,7 @@ namespace ParallelPictureProcessing
 
         public static byte[] AddAdditiveNoise(ref List<byte[]> bytes, int channelIndex, double max, int threadsNum)
         {
-            if(bytes == null) return bytes[channelIndex];
+            if (bytes == null) return bytes[channelIndex];
             CountOfNoises = 0;
 
             byte[] curBytes = bytes[channelIndex];
@@ -1171,7 +1203,7 @@ namespace ParallelPictureProcessing
                     int noiseVal = (int)(r.NextDouble() * max - max / 2);
                     curBytes[i] = (byte)Math.Max(0, Math.Min(255, curBytes[i] + noiseVal));
                 });
-              
+
             }
 
             return curBytes;
@@ -1390,7 +1422,7 @@ namespace ParallelPictureProcessing
                     double r = 0, g = 0, b = 0;
                     int count = 0;
 
-                    for (int i = 0, row = 0; i < maskHeight ; i++, row++)
+                    for (int i = 0, row = 0; i < maskHeight; i++, row++)
                     {
                         for (int j = 0, col = 0; j < maskWidth; j++, col++)
                         {
@@ -1399,9 +1431,9 @@ namespace ParallelPictureProcessing
 
                             int index = (pixelY * width + pixelX) * ppb;
 
-                            r +=  (1.0d / (image[index] == 0? 1 : image[index]));  
-                            g +=  (1.0d / (image[index +1] == 0? 1 : image[index +1]));
-                            b +=  (1.0d / (image[index +2] == 0? 1 : image[index +2]));
+                            r += (1.0d / (image[index] == 0 ? 1 : image[index]));
+                            g += (1.0d / (image[index + 1] == 0 ? 1 : image[index + 1]));
+                            b += (1.0d / (image[index + 2] == 0 ? 1 : image[index + 2]));
 
                             count++;
                         }
@@ -1418,12 +1450,13 @@ namespace ParallelPictureProcessing
             return image;
         }
 
-        public static byte[] Apply2DGaussianFilter(byte[] image, double[,] kernel, int imgWidth, int imgHeight, int pixelPerByte)
+        public static byte[] Apply2DGaussianFilter(byte[] image, double[,] kernel, int imgWidth, int imgHeight, int pixelPerByte, int threads)
         {
             int kernelSize = kernel.GetLength(0);
             int halfKernelSize = kernelSize / 2;
+            var result = new byte[image.Length];
 
-            for (int i = 0; i < imgWidth; i++)
+            Parallel.For(0, imgWidth, new ParallelOptions() { MaxDegreeOfParallelism = threads }, i =>
             {
                 for (int j = 0; j < imgHeight; j++)
                 {
@@ -1448,13 +1481,13 @@ namespace ParallelPictureProcessing
                     }
 
                     int resultIndex = (j * imgWidth + i) * pixelPerByte;
-                    image[resultIndex] = (byte)sumR;
-                    image[resultIndex + 1] = (byte)sumG;
-                    image[resultIndex + 2] = (byte)sumB;
+                    result[resultIndex] = (byte)sumR;
+                    result[resultIndex + 1] = (byte)sumG;
+                    result[resultIndex + 2] = (byte)sumB;
                 }
-            }
+            });
 
-            return image;
+            return result;
         }
 
 
@@ -1497,6 +1530,7 @@ namespace ParallelPictureProcessing
         public static byte[] ApplyLocalHistogrammFilter(byte[] image, int width, int height, int pixelPerByte, int filterSize, int threads = 1)
         {
             int imageSize = image.Length;
+            byte[] result = new byte[imageSize];
 
             Parallel.For(0, height, new ParallelOptions { MaxDegreeOfParallelism = threads }, y =>
             {
@@ -1531,13 +1565,13 @@ namespace ParallelPictureProcessing
                     byte medianG = FindMedian(histogramG);
                     byte medianB = FindMedian(histogramB);
 
-                    image[index] = medianR;
-                    image[index + 1] = medianG;
-                    image[index + 2] = medianB;
+                    result[index] = medianR;
+                    result[index + 1] = medianG;
+                    result[index + 2] = medianB;
                 }
             });
 
-            return image;
+            return result;
         }
 
         private static byte FindMedian(int[] histogram)
@@ -1560,6 +1594,7 @@ namespace ParallelPictureProcessing
         public static byte[] ApplyParallelRecursiveFilter(byte[] image, int width, int height, int pixelPerByte, int filterSize, int threads = 1)
         {
             int imageSize = image.Length;
+            var result = new byte[imageSize];
 
             Parallel.For(0, height, new ParallelOptions { MaxDegreeOfParallelism = threads }, y =>
             {
@@ -1572,12 +1607,12 @@ namespace ParallelPictureProcessing
 
                     for (int i = 0; i < pixelPerByte; i++)
                     {
-                        image[index + i] = (byte)(sum[i] / ((filterSize * 2 + 1) * (filterSize * 2 + 1)));
+                        result[index + i] = (byte)(sum[i] / ((filterSize * 2 + 1) * (filterSize * 2 + 1)));
                     }
                 }
             });
 
-            return image;
+            return result;
         }
 
         private static void ApplyRecursiveFilter(byte[] image, int width, int height, int pixelPerByte, int filterSize, int x, int y, double[] sum, int recursionDepth)
@@ -1709,7 +1744,7 @@ namespace ParallelPictureProcessing
             return result;
         }
 
-        public static byte[] LaplaceOperator(byte[] image, int width, int height, int ppb,int threads, double gain, double threshold, double[,] laplaceKernel)
+        public static byte[] LaplaceOperator(byte[] image, int width, int height, int ppb, int threads, double gain, double threshold, double[,] laplaceKernel)
         {
             byte[] result = new byte[image.Length];
             int kernelSize = laplaceKernel.GetLength(0);
@@ -1745,7 +1780,7 @@ namespace ParallelPictureProcessing
             return result;
         }
 
-        public static byte[] GlobalThresholding(byte[] image, int width, int height, int ppb,int threads,  int globalThreshold)
+        public static byte[] GlobalThresholding(byte[] image, int width, int height, int ppb, int threads, int globalThreshold)
         {
             byte[] result = new byte[image.Length];
 
@@ -1769,7 +1804,7 @@ namespace ParallelPictureProcessing
             return result;
         }
 
-        public static byte[] LocalNiblackThresholding(byte[] image, int width, int height, int ppb, int threads,  double niblackK, int windowSize)
+        public static byte[] LocalNiblackThresholding(byte[] image, int width, int height, int ppb, int threads, double niblackK, int windowSize)
         {
             byte[] result = new byte[image.Length];
 
@@ -1814,7 +1849,7 @@ namespace ParallelPictureProcessing
         {
             byte[] result = new byte[image.Length];
 
-            Parallel.For(0, height, new ParallelOptions() { MaxDegreeOfParallelism=threads }, y =>
+            Parallel.For(0, height, new ParallelOptions() { MaxDegreeOfParallelism = threads }, y =>
             {
                 for (int x = 0; x < width; x++)
                 {
@@ -1847,7 +1882,7 @@ namespace ParallelPictureProcessing
             return result;
         }
 
-        public static byte[] Erosion(byte[] image, int width, int height, int ppb, int threads,  double[,] mask)
+        public static byte[] Erosion(byte[] image, int width, int height, int ppb, int threads, double[,] mask)
         {
             byte[] result = new byte[image.Length];
 
@@ -1884,4 +1919,47 @@ namespace ParallelPictureProcessing
             return result;
         }
     }
+
+    public static class TextureLab{
+
+        public static byte[] GenerateEnergyMap(byte[] image, int width, int height, int ppb)
+        {
+            byte[] energyMap = new byte[image.Length];
+
+            // Применение оператора Лапласа для каждого пикселя изображения
+            for (int y = 1; y < height - 1; y++)
+            {
+                for (int x = 1; x < width - 1; x++)
+                {
+                    int currentIndex = (y * width + x) * ppb;
+
+                    int laplacian = 0;
+
+                    // Вычисление суммы весовых коэффициентов для окружающих пикселей
+                    for (int i = -1; i <= 1; i++)
+                    {
+                        for (int j = -1; j <= 1; j++)
+                        {
+                            int neighborIndex = ((y + i) * width + (x + j)) * ppb;
+                            int neighborIntensity = (int)(0.299 * image[neighborIndex] + 0.587 * image[neighborIndex + 1] + 0.114 * image[neighborIndex + 2]);
+
+                            // Увеличиваем вес пикселя в центре и уменьшаем вес соседних пикселей
+                            laplacian += (i == 0 && j == 0) ? 8 * neighborIntensity : -neighborIntensity;
+                        }
+                    }
+
+                    // Ограничение значений от 0 до 255 и запись в энергетическую карту
+                    energyMap[currentIndex] = (byte)Math.Max(0, Math.Min(255, laplacian));
+                    energyMap[currentIndex + 1] = energyMap[currentIndex];
+                    energyMap[currentIndex + 2] = energyMap[currentIndex];
+                }
+            }
+
+            return energyMap;
+        }
+
+
+    }
+
+
 }

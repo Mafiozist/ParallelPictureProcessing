@@ -191,13 +191,16 @@
                     <TextBox x:Name="SegmentationVal">
                         
                     </TextBox>
-                    <Button x:Name="Segmentation">
-                        Сегментировать
+                    <Button x:Name="Segmentation" Click="Segmentation_Click">
+                        Сегментировать (не сделано)
                     </Button>
                 </StackPanel>
             </TabItem>
             <TabItem Header="Л4">
-
+                <StackPanel>
+                    <Button x:Name="FindLines" Click="FindLines_Click">Найти линии (Хафф)</Button>
+                    <Button>Найти окружность (Хафф)</Button>
+                </StackPanel>
             </TabItem>
         </TabControl>
 
@@ -220,8 +223,9 @@
             <Image x:Name="transformedImg" MinHeight="302" MouseDown="transformedImg_MouseDown" MinWidth="332" Stretch="Fill" VerticalAlignment="Stretch" RenderOptions.BitmapScalingMode="HighQuality"/>
         </StackPanel>
 
-        <TextBox x:Name="Logs" Grid.Row="1" Grid.ColumnSpan="3" ></TextBox>
-        <TextBox x:Name="LogsRaw" Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" ></TextBox>
+        <TextBox x:Name="Logs" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="1" ></TextBox>
+        <TextBox x:Name="LogsRaw" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="1" ></TextBox>
+        <TextBox x:Name="FilterLogsRaw" Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="1" ></TextBox>
     </Grid>
 
 
