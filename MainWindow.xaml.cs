@@ -1928,7 +1928,76 @@ namespace ParallelPictureProcessing
             return result;
         }
 
-        public static double[] CreateWeightMatrix(byte[] image, int width, int height, int ppb, int channel =0 )
+        public static double[] CreateWeightMatrix(byte[] image, int width, int height, int ppb, int channel = 0)
+        {
+            int nWidth = width + width, nHeight = height + height;
+            int n = nWidth * nHeight;
+            double[] weightMatrix = new double[n];
+
+            for (int i = 0; i < height; i++)
+            {
+                for (int j = 0; j < width; j++)
+                {
+                    int pixelIndex = (i * width + j) * ppb;
+                    byte channelValue = image[pixelIndex + channel];
+
+                    // Индексы соседних пикселей
+                    int rightPixelIndex = j < width - 1 ? (i * width + (j + 1)) * ppb : -1;
+                    int bottomPixelIndex = i < height - 1 ? ((i + 1) * width + j) * ppb : -1;
+
+                    // Индекс текущего пикселя в матрице весов
+                    int wPixelIndex = j==0? i * nWidth + j : i * nWidth + j + (pixelIndex /3);
+
+                    // Устанавливаем значение текущей яркости пикселя в матрицу весов
+                    weightMatrix[wPixelIndex] = channelValue;
+
+                    // Записываем разницу между текущим и правым пикселем
+                    if (j < width - 1 && rightPixelIndex >= 0) // правый пиксель
+                        weightMatrix[wPixelIndex + 1] = Math.Abs(channelValue - image[rightPixelIndex + channel]);
+
+                    // Записываем разницу между текущим и нижним пикселем
+                    if (i < height - 1 && bottomPixelIndex >= 0) // нижний пиксель
+                        weightMatrix[wPixelIndex + nWidth] = Math.Abs(channelValue - image[bottomPixelIndex + channel]);
+                }
+            }
+
+            using (var writer = new StreamWriter("weights.txt"))
+            {
+                for (int i = 0; i < nHeight; i++)
+                {
+                    for (int j = 0; j < nWidth; j++)
+                    {
+                        writer.Write(weightMatrix[i * nWidth + j]);
+
+                        // если не последний элемент в строке, добавляем пробел
+                        if (j < nWidth - 1)
+                            writer.Write(" ");
+                    }
+                    // переход на новую строку
+                    writer.WriteLine();
+                }
+            }
+
+            using (var writer = new StreamWriter("imgC.txt"))
+            {
+                for (int i = 0; i < height; i++)
+                {
+                    for (int j = 0; j < width * ppb; j += ppb)
+                    {
+                        writer.Write(image[i * width * ppb + j]); // Записываем значение текущего канала пикселя
+
+                        // Если не последний элемент в строке, добавляем пробел
+                        if (j < width * ppb - ppb)
+                            writer.Write(" ");
+                    }
+                    // Переход на новую строку
+                    writer.WriteLine();
+                }
+            }
+            return weightMatrix;
+        }
+
+        public static double[] CreateWeightMatrix2(byte[] image, int width, int height, int ppb, int channel =0 )
         {
             int nWidth = width + 2, nHeight = width + 2;
             int n = nWidth * nHeight * ppb;
@@ -1981,14 +2050,14 @@ namespace ParallelPictureProcessing
                    weightMatrix[wPixelIndex] = image[pixelIndex];
 
                     // Записываем веса между текущим пикселем и его соседями
-                    if (j > 0 && leftPixelIndex >= 0) // левый пиксель
-                        weightMatrix[leftPixelIndex] = Math.Abs(channelValue - image[leftPixelIndex + channel]);
+                    //if (j > 0 && leftPixelIndex >= 0) // левый пиксель
+                    //    weightMatrix[leftPixelIndex] = Math.Abs(channelValue - image[leftPixelIndex + channel]);
 
                     if ((j < width - ppb) && rightPixelIndex >= 0) // правый пиксель
                         weightMatrix[rightPixelIndex] = Math.Abs(channelValue - image[rightPixelIndex + channel]);
 
-                    if (i > 0 && topPixelIndex >= 0) // верхний пиксель
-                        weightMatrix[topPixelIndex] = Math.Abs(channelValue - image[topPixelIndex  + channel]);
+                    //if (i > 0 && topPixelIndex >= 0) // верхний пиксель
+                    //    weightMatrix[topPixelIndex] = Math.Abs(channelValue - image[topPixelIndex  + channel]);
 
                     if ((i < height - 1) && bottomPixelIndex >= 0) // нижний пиксель
                         weightMatrix[bottomPixelIndex] = Math.Abs(channelValue - image[bottomPixelIndex + channel]);
