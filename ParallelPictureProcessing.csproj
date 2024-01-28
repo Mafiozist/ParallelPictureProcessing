@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.13.9" />
+    <PackageReference Include="ExcelLibrary" Version="1.2011.7.31" />
     <PackageReference Include="LiveCharts.Wpf" Version="0.9.7" />
     <PackageReference Include="MathNet.Numerics" Version="5.0.0" />
     <PackageReference Include="System.Drawing.Common" Version="7.0.0" />

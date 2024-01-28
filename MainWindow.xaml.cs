@@ -52,6 +52,7 @@ using Microsoft.Diagnostics.Runtime.Utilities;
 using Perfolizer.Mathematics.Thresholds;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using System.Security.Policy;
+using ExcelLibrary.SpreadSheet;
 
 namespace ParallelPictureProcessing
 {
@@ -1930,7 +1931,7 @@ namespace ParallelPictureProcessing
 
         public static double[] CreateWeightMatrix(byte[] image, int width, int height, int ppb, int channel = 0)
         {
-            int nWidth = width + width, nHeight = height + height;
+            int nWidth = width + width, nHeight = height * 2;
             int n = nWidth * nHeight;
             double[] weightMatrix = new double[n];
 
@@ -1946,7 +1947,8 @@ namespace ParallelPictureProcessing
                     int bottomPixelIndex = i < height - 1 ? ((i + 1) * width + j) * ppb : -1;
 
                     // Индекс текущего пикселя в матрице весов
-                    int wPixelIndex = j==0? i * nWidth + j : i * nWidth + j + (pixelIndex /3);
+                    int wRowIndex = i * 2;
+                    int wPixelIndex = j == 0 ? wRowIndex * nWidth : wRowIndex * nWidth + j * 2;
 
                     // Устанавливаем значение текущей яркости пикселя в матрицу весов
                     weightMatrix[wPixelIndex] = channelValue;
@@ -1961,39 +1963,36 @@ namespace ParallelPictureProcessing
                 }
             }
 
-            using (var writer = new StreamWriter("weights.txt"))
-            {
-                for (int i = 0; i < nHeight; i++)
-                {
-                    for (int j = 0; j < nWidth; j++)
-                    {
-                        writer.Write(weightMatrix[i * nWidth + j]);
 
-                        // если не последний элемент в строке, добавляем пробел
-                        if (j < nWidth - 1)
-                            writer.Write(" ");
-                    }
-                    // переход на новую строку
-                    writer.WriteLine();
+            Workbook wb = new Workbook();
+            Worksheet ws = new Worksheet("ws");
+            wb.Worksheets.Add(ws);
+
+            for (int i = 0; i < nHeight; i++)
+            {
+                for (int j = 0; j < nWidth; j++)
+                {
+                    ws.Cells[i, j] = new Cell(weightMatrix[i * nWidth + j]);
                 }
+
             }
 
-            using (var writer = new StreamWriter("imgC.txt"))
-            {
-                for (int i = 0; i < height; i++)
-                {
-                    for (int j = 0; j < width * ppb; j += ppb)
-                    {
-                        writer.Write(image[i * width * ppb + j]); // Записываем значение текущего канала пикселя
+            Worksheet ws2 = new Worksheet("image");
+            wb.Worksheets.Add(ws2);
 
-                        // Если не последний элемент в строке, добавляем пробел
-                        if (j < width * ppb - ppb)
-                            writer.Write(" ");
-                    }
-                    // Переход на новую строку
-                    writer.WriteLine();
+
+            for (int i = 0; i < height; i++)
+            {
+                for (int j = 0; j < width * ppb; j += ppb)
+                {
+                    ws2.Cells[i, j] = new Cell(image[i * width * ppb + j]);
                 }
+
             }
+
+
+            wb.Save("w.xls");
+
             return weightMatrix;
         }
 
