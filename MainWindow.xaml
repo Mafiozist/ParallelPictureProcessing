@@ -183,7 +183,9 @@
                     <Separator Height="10"></Separator>
                     
                     <ComboBox x:Name="SegmentationType">
-                        <ComboBoxItem Tag="0" IsSelected="True">                            Алгоритм на базе теории графов                        </ComboBoxItem>
+                        <ComboBoxItem Tag="0" IsSelected="True">
+                            Алгоритм на базе теории графов
+                        </ComboBoxItem>
                         <ComboBoxItem Tag="1">
                             Алгоритм разделения областей (принцип квадродерева)
                         </ComboBoxItem>

@@ -48,6 +48,10 @@ using MathNet.Numerics;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Factorization;
 using MathNet.Numerics.Statistics;
+using Microsoft.Diagnostics.Runtime.Utilities;
+using Perfolizer.Mathematics.Thresholds;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.Security.Policy;
 
 namespace ParallelPictureProcessing
 {
@@ -732,6 +736,11 @@ namespace ParallelPictureProcessing
             int threads = Convert.ToInt32(ThreadsCount.Value);
             int width = (int)original.Width, height = (int)original.Height;
 
+            
+            var weightMatrix = EdgeDetection.CreateWeightMatrix(picesOfYCbCrBytes[index], width, height, 3);
+            //List<byte[]> segments = EdgeDetection.SegmentImage(picesOfYCbCrBytes[index], width, height, 3, threads, Convert.ToDouble(SegmentationVal.Text));
+
+            //SetTransformedImageFromBytes(segments[0], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
         }
 
         private void FindLines_Click(object sender, RoutedEventArgs e)
@@ -741,8 +750,8 @@ namespace ParallelPictureProcessing
             int threads = Convert.ToInt32(ThreadsCount.Value);
             int width = (int)original.Width, height = (int)original.Height;
 
-            picesOfYCbCrBytes[index]= TextureLab.DetectShapes(picesOfYCbCrBytes[index], width, height, 3, threads, "line");
-            SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            //picesOfYCbCrBytes[index]= TextureLab.DetectShapes(picesOfYCbCrBytes[index], width, height, 3, threads, "line");
+            //SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
         }
     }
 
@@ -1648,7 +1657,7 @@ namespace ParallelPictureProcessing
     public class ColorType
     {
         public int Key { get; set; }
-        public string Value { get; set; } = String.Empty;
+        public string Value { get; set; } = System.String.Empty;
     }
 
     public class HSVPixel
@@ -1918,6 +1927,219 @@ namespace ParallelPictureProcessing
 
             return result;
         }
+
+        public static double[] CreateWeightMatrix(byte[] image, int width, int height, int ppb, int channel =0 )
+        {
+            int nWidth = width + 2, nHeight = width + 2;
+            int n = nWidth * nHeight * ppb;
+            double[] weightMatrix = new double[n];
+
+            for (int i = 0; i < height; i ++)
+            {
+                for (int j = 0; j < width; j+= ppb)
+                {
+                    int pixelIndex = (i * width * ppb + j);
+                    byte channelValue = image[pixelIndex + channel];
+
+                    // Индексы соседних пикселей
+                    int leftPixelIndex = j > 0? (i * width * ppb + (j - ppb))  : -1;
+                    int rightPixelIndex = j < width * ppb? (i * width * ppb + (j + ppb))  : -1;
+                    int topPixelIndex = i>0 ? ((i - 1) * width * ppb + j)  : -1;
+                    int bottomPixelIndex = i < height? ((i + 1) * width * ppb + j)  : -1;
+
+                    // Индексы соседних пикселей матрицы весов
+                    int wPixelIndex = 0;
+
+                    if (i == 0 && j == 0 || i == nHeight - 1 && j == nWidth - ppb )
+                    {
+                        wPixelIndex = pixelIndex;
+                    }
+                    //else if (i == 0)
+                    //{
+                    //    wPixelIndex = pixelIndex + ppb;
+                    //}
+                    else if (i == 0)
+                    {
+                        wPixelIndex = pixelIndex + ppb;
+                    }
+                    else if(j == 0)
+                    {
+                        wPixelIndex = bottomPixelIndex;// поскольку строки сдвигаются
+                    }
+                    else if (j > 0 && i > 0)
+                    {
+                        wPixelIndex = pixelIndex + width * ppb;
+                    }
+
+
+                    int leftWPI = j > 0 ? wPixelIndex - ppb: -1;
+                    int rightWPI = j < width ? wPixelIndex + ppb : -1;
+                    int topWPI = i > 0 ? wPixelIndex - width * ppb : -1;
+                    int bottomWPIx = i < height ? wPixelIndex + width * ppb : -1;
+
+                   //Вычисляем индексы весов для текущего
+                   weightMatrix[wPixelIndex] = image[pixelIndex];
+
+                    // Записываем веса между текущим пикселем и его соседями
+                    if (j > 0 && leftPixelIndex >= 0) // левый пиксель
+                        weightMatrix[leftPixelIndex] = Math.Abs(channelValue - image[leftPixelIndex + channel]);
+
+                    if ((j < width - ppb) && rightPixelIndex >= 0) // правый пиксель
+                        weightMatrix[rightPixelIndex] = Math.Abs(channelValue - image[rightPixelIndex + channel]);
+
+                    if (i > 0 && topPixelIndex >= 0) // верхний пиксель
+                        weightMatrix[topPixelIndex] = Math.Abs(channelValue - image[topPixelIndex  + channel]);
+
+                    if ((i < height - 1) && bottomPixelIndex >= 0) // нижний пиксель
+                        weightMatrix[bottomPixelIndex] = Math.Abs(channelValue - image[bottomPixelIndex + channel]);
+                }
+            }
+
+            using (var writer = new StreamWriter("weights.txt"))
+            {
+                for (int i = 0; i < nHeight; i++)
+                {
+                    for (int j = 0; j < nWidth * ppb; j++)
+                    {
+                        writer.Write(weightMatrix[i * nWidth * ppb + j]);
+
+                        // если не последний элемент в строке, добавляем пробел
+                        if (j < nWidth * ppb - 1)
+                            writer.Write(" ");
+                    }
+                    // переход на новую строку
+                    writer.WriteLine();
+                }
+            }
+
+            using (var writer = new StreamWriter("imgC.txt"))
+            {
+                for (int i = 0; i < height; i++)
+                {
+                    for (int j = 0; j < width * ppb; j += ppb)
+                    {
+                        writer.Write(image[i * width * ppb + j]); // Записываем значение текущего канала пикселя
+
+                        // Если не последний элемент в строке, добавляем пробел
+                        if (j < width * ppb - ppb)
+                            writer.Write(" ");
+                    }
+                    // Переход на новую строку
+                    writer.WriteLine();
+                }
+            }
+
+            return weightMatrix;
+        }
+
+    //    public static double[,] CreateWeightMatrix(byte[] image, int width, int height, int ppb, int channel = 0)
+    //    {
+    //        int nWidth= width + 2, nHeight = width + 2;
+    //        double[,] weightMatrix = new double[nWidth + 1, nHeight ];
+
+
+    //        // Проходим по всем пикселям изображения
+    //        for (int i = 0; i< height; i++)
+    //        {
+    //            for (int j = 0; j < width; j++)
+    //            {
+    //                int pixelIndex = i * width + j;
+
+    //                byte channelValue = image[pixelIndex + channel]; // Получаем значение выбранного канала
+
+    //                // Вычисляем индексы соседних пикселей (верхний, нижний, левый и правый)
+    //                int leftIndex = j > 0 ? pixelIndex - 1 : pixelIndex;
+    //                int rightIndex = j < width - 1 ? pixelIndex + 1 : pixelIndex;
+    //                int topIndex = i > 0 ? (pixelIndex - width) * ppb : pixelIndex;
+    //                int bottomIndex = i < height - 1 ? (pixelIndex + width) * ppb : pixelIndex;
+
+    //                // Проверяем существование соседей и вычисляем веса между пикселями
+    //                byte leftChannelValue = image[leftIndex + channel];
+    //                byte rightChannelValue = image[rightIndex + channel];
+    //                byte topChannelValue = image[topIndex + channel];
+    //                byte bottomChannelValue = image[bottomIndex + channel];
+
+    //                int wMatrixIntensXIndex = (pixelIndex - j) / width, 
+    //                    wMatrixIntensYIndex = (pixelIndex - j) / height;
+
+    //                int wMatrixTop = wMatrixIntensYIndex - 1, 
+    //                    wMatrixBottoom = wMatrixIntensYIndex + 1, 
+    //                    wMatrixRight = wMatrixIntensXIndex + 1, 
+    //                    wMatrixLeft = wMatrixIntensXIndex - 1;
+
+    //                try
+    //                {
+    //                    weightMatrix[wMatrixIntensXIndex, wMatrixIntensYIndex] = image[pixelIndex]; // Диагональные элементы (сам пиксель)
+    //                }
+    //              catch (Exception ex) { }
+
+    //                try
+    //                {
+    //                    weightMatrix[pixelIndex * 4, leftIndex * 4 + 1] = Math.Abs(channelValue - leftChannelValue); // Левый сосед
+    //                }
+    //                catch (Exception) { }
+
+
+    //                try
+    //                {
+    //                    weightMatrix[pixelIndex * 4, rightIndex * 4 + 2] = Math.Abs(channelValue - rightChannelValue); // Правый сосед
+    //                }
+    //                catch { }
+
+    //                try
+    //                {
+    //                    weightMatrix[pixelIndex * 4, topIndex * 4 + 3] = Math.Abs(channelValue - topChannelValue); // Верхний сосед
+    //                }
+    //                catch { }
+
+    //                try
+    //                {
+    //                    weightMatrix[pixelIndex * 4, bottomIndex * 4 + 4] = Math.Abs(channelValue - bottomChannelValue); // Нижний сосед
+    //                }
+    //                catch { }
+
+    //            }
+    //        };
+
+    //        using (var writer = new StreamWriter("weights.txt"))
+    //        {
+
+    //            for (int i = 0; i < weightMatrix.GetLength(1); i++)
+    //            {
+    //                for (int j = 0; j < weightMatrix.GetLength(0); j++)
+    //                {
+    //                    writer.Write(weightMatrix[i, j]);
+
+    //                    // если не последний элемент в строке, добавляем пробел
+    //                    if (j < weightMatrix.GetLength(0) - 1)
+    //                        writer.Write(" ");
+    //                }
+    //                // переход на новую строку
+    //                writer.WriteLine();
+    //            }
+    //        }
+
+    //        using (StreamWriter writer = new StreamWriter("imgC.txt"))
+    //        {
+
+    //            for (int i = 0; i < height; i++)
+    //            {
+    //                for (int j = 0; j < width; j++)
+    //                {
+    //                    writer.Write(image[(i * width + j)]); // Записываем значение первого канала пикселя
+
+    //                    // Если не последний элемент в строке, добавляем пробел
+    //                    if (j < width - 1)
+    //                        writer.Write(" ");
+    //                }
+    //                // Переход на новую строку
+    //                writer.WriteLine();
+    //            }
+    //        }
+
+    //        return weightMatrix;
+    //    }
+
     }
 
     public static class TextureLab{
@@ -1958,8 +2180,77 @@ namespace ParallelPictureProcessing
             return energyMap;
         }
 
-
+      
     }
 
+    // Класс для представления ребра графа
+    class Edge : IComparable<Edge>
+    {
+        public int u; // Номер первой вершины
+        public int v; // Номер второй вершины
+        public double w; // Вес ребра
+
+        public Edge(int u, int v, double w)
+        {
+            this.u = u;
+            this.v = v;
+            this.w = w;
+        }
+
+        // Метод для сравнения ребер по весу
+        public int CompareTo(Edge other)
+        {
+            return w.CompareTo(other.w);
+        }
+    }
+
+    // Класс для представления системы непересекающихся множеств
+    class DisjointSet
+    {
+        private int[] parent; // Массив родителей для каждого элемента
+        private int[] rank; // Массив рангов для каждого элемента
+
+        public DisjointSet(int n)
+        {
+            parent = new int[n];
+            rank = new int[n];
+            for (int i = 0; i < n; i++)
+            {
+                parent[i] = i; // Изначально каждый элемент - свой собственный родитель
+                rank[i] = 0; // Изначально ранг каждого элемента равен нулю
+            }
+        }
+
+        // Метод для поиска представителя множества, в котором находится элемент x
+        public int Find(int x)
+        {
+            if (parent[x] != x) // Если x не является родителем самого себя
+            {
+                parent[x] = Find(parent[x]); // Рекурсивно ищем родителя для x и обновляем его
+            }
+            return parent[x]; // Возвращаем родителя для x
+        }
+
+        // Метод для объединения двух множеств, в которых находятся элементы x и y
+        public void Union(int x, int y)
+        {
+            int xRoot = Find(x); // Находим представителя множества для x
+            int yRoot = Find(y); // Находим представителя множества для y
+            if (xRoot == yRoot) return; // Если они совпадают, то множества уже объединены
+            if (rank[xRoot] < rank[yRoot]) // Если ранг множества для x меньше ранга множества для y
+            {
+                parent[xRoot] = yRoot; // Делаем y родителем для x
+            }
+            else if (rank[xRoot] > rank[yRoot]) // Если ранг множества для x больше ранга множества для y
+            {
+                parent[yRoot] = xRoot; // Делаем x родителем для y
+            }
+            else // Если ранги множеств равны
+            {
+                parent[yRoot] = xRoot; // Делаем x родителем для y
+                rank[xRoot]++; // Увеличиваем ранг множества для x на единицу
+            }
+        }
+    }
 
 }
