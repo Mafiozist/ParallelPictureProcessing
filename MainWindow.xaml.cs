@@ -1985,9 +1985,8 @@ namespace ParallelPictureProcessing
             {
                 for (int j = 0; j < width * ppb; j += ppb)
                 {
-                    ws2.Cells[i, j] = new Cell(image[i * width * ppb + j]);
+                    ws2.Cells[i, j / ppb] = new Cell(image[(i * width + j / ppb) * ppb + j % ppb]);
                 }
-
             }
 
 
