@@ -200,6 +200,8 @@
             </TabItem>
             <TabItem Header="Л4">
                 <StackPanel>
+                    <Label>Кол-во голосов</Label>
+                    <TextBox x:Name="VotesTB"></TextBox>
                     <Button x:Name="FindLines" Click="FindLines_Click">Найти линии (Хафф)</Button>
                     <Button Click="FindCircle_Click">Найти окружность (Хафф)</Button>
                 </StackPanel>

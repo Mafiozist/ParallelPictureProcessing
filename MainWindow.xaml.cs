@@ -768,7 +768,7 @@ namespace ParallelPictureProcessing
 
             try
             {
-                picesOfYCbCrBytes[index] = TextureLab.DetectLinesAndCircles(picesOfYCbCrBytes[index], width, height, 3, false);
+                picesOfYCbCrBytes[index] = TextureLab.DetectLinesAndCircles(picesOfYCbCrBytes[index], width, height, 3, false, Convert.ToInt32(VotesTB.Text));
                 SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
             }catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
@@ -782,7 +782,7 @@ namespace ParallelPictureProcessing
 
             try
             {
-                picesOfYCbCrBytes[index] = TextureLab.DetectLinesAndCircles(picesOfYCbCrBytes[index], width, height, 3, true);
+                picesOfYCbCrBytes[index] = TextureLab.DetectLinesAndCircles(picesOfYCbCrBytes[index], width, height, 3, true, Convert.ToInt32(VotesTB.Text));
                 SetTransformedImageFromBytes(picesOfYCbCrBytes[index], System.Drawing.Imaging.PixelFormat.Format24bppRgb);
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
@@ -2073,7 +2073,7 @@ namespace ParallelPictureProcessing
 
     public static class TextureLab{
 
-        public static byte[] DetectLinesAndCircles(byte[] image, int width, int height, int ppb, bool isCircle)
+        public static byte[] DetectLinesAndCircles(byte[] image, int width, int height, int ppb, bool isCircle, int votes = 70)
         {
             // Преобразование изображения в двумерный массив
             int[,] imageData = new int[height, width];
@@ -2093,7 +2093,7 @@ namespace ParallelPictureProcessing
             int[,] accumulator = new int[rMax, thetaMax];
 
             // Проход по изображению для поиска контуров
-            for (int y = 0; y < height; y++)
+            Parallel.For(0, height, y =>
             {
                 for (int x = 0; x < width; x++)
                 {
@@ -2106,47 +2106,52 @@ namespace ParallelPictureProcessing
                             int r = (int)Math.Round(x * Math.Cos(radians) + y * Math.Sin(radians));
                             if (r >= 0 && r < rMax)
                             {
-                                accumulator[r, theta]++;
+                                lock (accumulator)
+                                {
+                                    accumulator[r, theta]++;
+                                }
                             }
                         }
                     }
                 }
-            }
+            });
 
-            // Поиск максимальных значений в пространстве Хафа
-            int maxVotes = 0;
-            int maxR = 0, maxTheta = 0;
+            // Находим порог для количества голосов, чтобы определить линию или окружность
+            int threshold = votes;
+
+            // Создаем список для хранения координат линий и окружностей
+            List<(int, int, int)> linesAndCircles = new List<(int, int, int)>();
+
+            // Поиск линий или окружностей с количеством голосов выше порога
             for (int r = 0; r < rMax; r++)
             {
                 for (int theta = 0; theta < thetaMax; theta++)
                 {
-                    if (accumulator[r, theta] > maxVotes)
+                    if (accumulator[r, theta] > threshold)
                     {
-                        maxVotes = accumulator[r, theta];
-                        maxR = r;
-                        maxTheta = theta;
+                        linesAndCircles.Add((r, theta, accumulator[r, theta]));
                     }
                 }
             }
 
             // Создание результирующего изображения с контурами
             byte[] resultImage = new byte[width * height * ppb];
-            for (int i = 0; i < resultImage.Length; i += ppb)
-            {
-                resultImage[i] = image[i];
-                resultImage[i + 1] = image[i];
-                resultImage[i + 2] = image[i];
-            }
+            Array.Copy(image, resultImage, image.Length);
 
-            // Отрисовка найденной линии или окружности
-            if (isCircle)
+            // Отрисовка найденных линий и окружностей
+            Parallel.ForEach(linesAndCircles, lineOrCircle =>
             {
-                DrawCircle(resultImage, width, height, maxR, maxTheta);
-            }
-            else
-            {
-                DrawLine(resultImage, width, height, maxR, maxTheta);
-            }
+                int r = lineOrCircle.Item1;
+                int theta = lineOrCircle.Item2;
+                if (isCircle)
+                {
+                    DrawCircle(resultImage, width, height, r, theta);
+                }
+                else
+                {
+                    DrawLine(resultImage, width, height, r, theta);
+                }
+            });
 
             return resultImage;
         }
@@ -2187,7 +2192,7 @@ namespace ParallelPictureProcessing
             }
         }
 
-        
+
     }
 
 
