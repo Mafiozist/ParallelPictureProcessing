@@ -201,7 +201,7 @@
             <TabItem Header="Л4">
                 <StackPanel>
                     <Button x:Name="FindLines" Click="FindLines_Click">Найти линии (Хафф)</Button>
-                    <Button>Найти окружность (Хафф)</Button>
+                    <Button Click="FindCircle_Click">Найти окружность (Хафф)</Button>
                 </StackPanel>
             </TabItem>
         </TabControl>
